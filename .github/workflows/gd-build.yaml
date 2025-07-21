@@ -65,7 +65,7 @@ env:
 jobs:
   Build:
     name: Build and Publish Artifact
-    runs-on: [self-hosted, 7908-caasdata]
+    runs-on: [self-hosted, 8569-caasaikatanaapps]
     outputs:
       katana-artifact-id: ${{ steps.katana-publish.outputs.artifact_id }}
     steps:
