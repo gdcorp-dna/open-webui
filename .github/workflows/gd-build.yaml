@@ -1,0 +1,128 @@
+name: Build and Publish Artifact
+
+on:
+  push:
+    branches:
+      - deploy-katana
+  workflow_dispatch:
+    inputs:
+      use_cuda:
+        description: 'Enable CUDA support'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      use_ollama:
+        description: 'Bundle Ollama in the image'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      cuda_version:
+        description: 'CUDA version (if CUDA enabled)'
+        required: false
+        default: 'cu128'
+        type: choice
+        options:
+          - 'cu117'
+          - 'cu121'
+          - 'cu128'
+  workflow_call:
+    inputs:
+      use_cuda:
+        description: 'Enable CUDA support'
+        required: false
+        default: 'false'
+        type: string
+      use_ollama:
+        description: 'Bundle Ollama in the image'
+        required: false
+        default: 'false'
+        type: string
+      cuda_version:
+        description: 'CUDA version (if CUDA enabled)'
+        required: false
+        default: 'cu128'
+        type: string
+    outputs:
+      katana-artifact-id:
+        description: 'The ID of the published Katana artifact'
+        value: ${{ jobs.Build.outputs.katana-artifact-id }}
+
+env:
+  # Build configuration
+  USE_CUDA: ${{ inputs.use_cuda || 'false' }}
+  USE_OLLAMA: ${{ inputs.use_ollama || 'false' }}
+  USE_CUDA_VER: ${{ inputs.cuda_version || 'cu128' }}
+  # Default embedding model for RAG
+  USE_EMBEDDING_MODEL: sentence-transformers/all-MiniLM-L6-v2
+  USE_RERANKING_MODEL: ''
+
+jobs:
+  Build:
+    name: Build and Publish Artifact
+    runs-on: [self-hosted, 7908-caasdata]
+    outputs:
+      katana-artifact-id: ${{ steps.katana-publish.outputs.artifact_id }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - id: katana-auth
+        name: Authenticate with Katana
+        uses: gdcorp-actions/katana-auth@v1
+
+      - id: katana-app
+        name: Get Katana App Info
+        uses: gdcorp-actions/katana-get-app@v1
+        with:
+          jwt: ${{ steps.katana-auth.outputs.jwt }}
+
+      - name: Build Open WebUI Docker Image
+        run: |
+          echo "🔧 Building Open WebUI Docker image..."
+          echo "Configuration:"
+          echo "  - USE_CUDA: ${{ env.USE_CUDA }}"
+          echo "  - USE_OLLAMA: ${{ env.USE_OLLAMA }}"
+          echo "  - USE_CUDA_VER: ${{ env.USE_CUDA_VER }}"
+          echo "  - BUILD_HASH: ${{ github.sha }}"
+
+          docker build \
+            --build-arg BUILD_HASH=${{ github.sha }} \
+            --build-arg USE_CUDA=${{ env.USE_CUDA }} \
+            --build-arg USE_OLLAMA=${{ env.USE_OLLAMA }} \
+            --build-arg USE_CUDA_VER=${{ env.USE_CUDA_VER }} \
+            --build-arg USE_EMBEDDING_MODEL=${{ env.USE_EMBEDDING_MODEL }} \
+            --build-arg USE_RERANKING_MODEL=${{ env.USE_RERANKING_MODEL }} \
+            --build-arg USE_TIKTOKEN_ENCODING_NAME=cl100k_base \
+            -t caas-open-webui:latest \
+            -t caas-open-webui:${{ github.sha }} \
+            .
+
+      - name: Tag Container for Katana
+        shell: bash
+        run: |
+          echo "🏷️ Tagging container for Katana..."
+          docker tag caas-open-webui:latest ${{ steps.katana-app.outputs.app }}:${{ github.sha }}
+
+      - id: katana-publish
+        name: Publish Katana Artifact
+        uses: gdcorp-actions/katana-publish-artifact@v1
+        with:
+          namespace: ${{ steps.katana-app.outputs.namespace }}
+          app: ${{ steps.katana-app.outputs.app }}
+          image_name: ${{ steps.katana-app.outputs.app }}:${{ github.sha }}
+          artifact_kind: ecs
+          artifact_options_json: |
+            {
+              "healthcheckPath": "/health",
+              "ports": [8443],
+              "protocol": "https"
+            }
