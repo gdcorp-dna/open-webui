@@ -9,7 +9,9 @@ on:
 jobs:
   test-runner:
     name: Test Runner Connectivity
-    runs-on: [self-hosted, 8569-caasaikatanaapps]
+    runs-on:
+      group: 8569-caasaikatanaapps
+      labels: self-hosted
     steps:
       - name: Basic System Info
         run: |
@@ -18,24 +20,24 @@ jobs:
           echo "Runner user: $(whoami)"
           echo "Current directory: $(pwd)"
           echo "Current time: $(date)"
-          
+
       - name: Test Docker Availability
         run: |
           echo "🐳 Testing Docker..."
           docker --version || echo "❌ Docker not available"
           docker info || echo "❌ Docker daemon not accessible"
-          
+
       - name: Test Environment
         run: |
           echo "🌍 Environment variables:"
           env | grep -E "(GITHUB_|RUNNER_)" | sort
-          
+
       - name: Test Network
         run: |
           echo "🌐 Testing network connectivity..."
           ping -c 2 github.com || echo "❌ Cannot reach github.com"
-          
+
       - name: Success Message
         run: |
           echo "✅ Runner group '8569-caasaikatanaapps' is working!"
-          echo "🎉 All basic tests passed" 
+          echo "🎉 All basic tests passed"
