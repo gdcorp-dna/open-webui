@@ -64,7 +64,7 @@ env:
 
 jobs:
   Build:
-    name: Build and Publish Artifact
+    name: Build and Publish Artifacts
     runs-on:
       group: 8569-caasaikatanaapps
       labels: self-hosted
