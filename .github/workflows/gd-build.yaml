@@ -1,4 +1,4 @@
-name: Build and Publish Artifact
+name: Build and Publish Artifacts
 
 on:
   push:
