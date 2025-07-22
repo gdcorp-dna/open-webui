@@ -66,8 +66,9 @@ jobs:
   Build:
     name: Build and Publish Artifacts
     runs-on:
-      group: 8569-caasaikatanaapps
-      labels: self-hosted
+      labels:
+        - 8569-caasaioi
+        - self-hosted
     outputs:
       katana-artifact-id: ${{ steps.katana-publish.outputs.artifact_id }}
     steps:
