@@ -24,6 +24,7 @@ When developing features that we want to contribute back to the open source proj
 1. Changes should be made directly under the `$lib` path, not in `$gclib`
 
 2. Follow the guidelines in the Open WebUI [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) document:
+
    - Open a discussion about your ideas first
    - Follow the project's coding standards
    - Include tests for new features
