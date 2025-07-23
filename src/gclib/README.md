@@ -17,6 +17,25 @@ This directory (`src/gclib`) contains our custom modifications to the Open WebUI
 
 4. In your custom `$gclib` files, continue to use `$gclib` imports for custom components and `$lib` imports for unmodified components.
 
+## Contributing Changes Back to Open WebUI
+
+When developing features that we want to contribute back to the open source project:
+
+1. Changes should be made directly under the `$lib` path, not in `$gclib`
+
+2. Follow the guidelines in the Open WebUI [CONTRIBUTING.md](../../docs/CONTRIBUTING.md) document:
+   - Open a discussion about your ideas first
+   - Follow the project's coding standards
+   - Include tests for new features
+   - Update documentation as necessary
+   - Write clear, descriptive commit messages
+   - Complete pull requests in a timely manner
+
+3. Before submitting a pull request to the Open WebUI repository:
+   - Ensure the code works with the original imports (not using `$gclib`)
+   - Test thoroughly to verify functionality
+   - Remove any company-specific code or references
+
 ## Benefits
 
 This approach:
@@ -25,3 +44,4 @@ This approach:
 - Requires minimal changes to the original `$lib` folder (only import statements)
 - Makes it easier to identify and maintain our custom modifications
 - Reduces merge conflicts when pulling updates from the original repository
+- Provides a clear path for contributing improvements back to the open source project
