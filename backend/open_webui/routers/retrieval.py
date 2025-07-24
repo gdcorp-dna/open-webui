@@ -1906,7 +1906,7 @@ def search_web(request: Request, engine: str, query: str) -> list[SearchResult]:
 
 @router.post("/process/web/search")
 async def process_web_search(
-    request: Request, form_data: SearchForm, user=Depends(get_verified_user)
+    request: Request, form_data: SearchForm, user=Depends(get_verified_user), user_message: str = ""
 ):
 
     urls = []
@@ -1920,9 +1920,9 @@ async def process_web_search(
                 search_web,
                 request,
                 request.app.state.config.WEB_SEARCH_ENGINE,
-                query,
+                user_message,
             )
-            for query in form_data.queries
+            # for query in form_data.queries
         ]
 
         search_results = await asyncio.gather(*search_tasks)
