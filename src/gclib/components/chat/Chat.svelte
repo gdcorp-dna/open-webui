@@ -13,6 +13,8 @@
 	import { get, type Unsubscriber, type Writable } from 'svelte/store';
 	import type { i18n as i18nType } from 'i18next';
 	import { WEBUI_BASE_URL } from '$lib/constants';
+	import { updateUserSettings } from '$lib/apis/users';
+	import SDMSwitch from '$gclib/components/common/SDMSwitch.svelte';
 
 	import {
 		chatId,
@@ -36,7 +38,8 @@
 		chatTitle,
 		showArtifacts,
 		tools,
-		toolServers
+		toolServers,
+		sdmMode
 	} from '$lib/stores';
 	import {
 		convertMessagesToHistory,
@@ -128,6 +131,14 @@
 
 	let chat = null;
 	let tags = [];
+	let chatRequireSdmMode = false;
+	let showSdmWarning = false;
+
+	// Watch for changes to sdmMode
+	$: if ($sdmMode !== undefined && chatRequireSdmMode) {
+		// Update SDM warning visibility when SDM mode changes
+		showSdmWarning = !$sdmMode;
+	}
 
 	let history = {
 		messages: {},
@@ -858,6 +869,11 @@
 
 			if (chatContent) {
 				console.log(chatContent);
+
+				// Check if chat was created with SDM mode on
+				chatRequireSdmMode = chatContent?.metadata?.sdmMode === true;
+				// Check current SDM mode setting and show warning if needed
+				showSdmWarning = chatRequireSdmMode && !$sdmMode;
 
 				selectedModels =
 					(chatContent?.models ?? undefined) !== undefined
@@ -1922,6 +1938,7 @@
 		let _chatId = $chatId;
 
 		if (!$temporaryChatEnabled) {
+			// Include sdmMode in chat metadata
 			chat = await createNewChat(localStorage.token, {
 				id: _chatId,
 				title: $i18n.t('New Chat'),
@@ -1931,7 +1948,10 @@
 				history: history,
 				messages: createMessagesList(history, history.currentId),
 				tags: [],
-				timestamp: Date.now()
+				timestamp: Date.now(),
+				metadata: {
+					sdmMode: $sdmMode
+				}
 			});
 
 			_chatId = chat.id;
@@ -1958,7 +1978,10 @@
 					history: history,
 					messages: createMessagesList(history, history.currentId),
 					params: params,
-					files: chatFiles
+					files: chatFiles,
+					metadata: {
+						sdmMode: $sdmMode
+					}
 				});
 				currentChatPage.set(1);
 				await chats.set(await getChatList(localStorage.token, $currentChatPage));
@@ -2003,7 +2026,7 @@
 	id="chat-container"
 >
 	{#if !loading}
-		<div in:fade={{ duration: 50 }} class="w-full h-full flex flex-col">
+		<div in:fade={{ duration: 50 }} class="w-full h-full flex flex-col relative">
 			{#if $settings?.backgroundImageUrl ?? null}
 				<div
 					class="absolute {$showSidebar
@@ -2017,7 +2040,39 @@
 				/>
 			{/if}
 
-			<PaneGroup direction="horizontal" class="w-full h-full">
+			{#if showSdmWarning && chatRequireSdmMode}
+				<div in:fade={{ duration: 150 }} class="absolute inset-0 bg-black z-40"></div>
+				<div in:fade={{ duration: 200, delay: 50 }} class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-yellow-50 dark:bg-yellow-900/90 px-6 py-6 rounded-lg text-yellow-800 dark:text-yellow-200 text-sm z-50 shadow-lg border border-yellow-200 dark:border-yellow-800 w-[90%] max-w-[500px]">
+					<div class="flex flex-col gap-4">
+						<div class="flex gap-4 items-center">
+							<div class="flex-shrink-0">
+								<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+								</svg>
+							</div>
+							<div>
+								<h3 class="text-base font-semibold">{$i18n.t('SDM Mode Required')}</h3>
+								<p class="mt-1">{$i18n.t('This chat was created with SDM Mode enabled. To view this chat, please enable SDM Mode.')}</p>
+							</div>
+						</div>
+						{#if ($settings?.sdmAllowed ?? false) || $user?.role === 'admin'}
+							<div class="flex items-center justify-center mt-2">
+								<span class="mr-2">{$i18n.t('Enable SDM Mode:')}</span>
+								<SDMSwitch on:change={() => {
+														// Hide warning when SDM mode is enabled
+														showSdmWarning = !$sdmMode;
+													}} />
+							</div>
+						{:else}
+							<div class="flex items-center justify-center mt-2">
+								<span class="text-yellow-700 dark:text-yellow-300">{$i18n.t('SDM Mode is disabled by administrator')}</span>
+							</div>
+						{/if}
+					</div>
+				</div>
+			{/if}
+
+			<PaneGroup direction="horizontal" class="w-full h-full  {chatRequireSdmMode && !$sdmMode ? 'opacity-20' : ''}">
 				<Pane defaultSize={50} class="h-full flex relative max-w-full flex-col">
 					<Navbar
 						bind:this={navbarElement}

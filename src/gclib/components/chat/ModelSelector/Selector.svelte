@@ -19,7 +19,8 @@
 		mobile,
 		temporaryChatEnabled,
 		settings,
-		config
+		config,
+		sdmMode
 	} from '$lib/stores';
 	import { toast } from 'svelte-sonner';
 	import { capitalizeFirstLetter, sanitizeResponseContent, splitStream } from '$lib/utils';
@@ -27,6 +28,7 @@
 
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Switch from '$lib/components/common/Switch.svelte';
+	import SDMSwitch from '$gclib/components/common/SDMSwitch.svelte';
 	import ChatBubbleOval from '$lib/components/icons/ChatBubbleOval.svelte';
 	import { goto } from '$app/navigation';
 	import dayjs from '$lib/dayjs';
@@ -132,9 +134,23 @@
 				})
 	).filter((item) => !(item.model?.info?.meta?.hidden ?? false));
 
-	$: if (selectedTag || selectedConnectionType) {
+	$: if (selectedTag || selectedConnectionType || $sdmMode !== undefined) {
 		resetView();
 	} else {
+		resetView();
+	}
+
+	// Watch for changes to sdmMode and update the model selection if needed
+	$: if ($sdmMode !== undefined) {
+		// Check if the currently selected model is still available in filtered items
+		if (value && filteredItems.findIndex(item => item.value === value) === -1) {
+			// Selected model is no longer in the filtered list
+			if (filteredItems.length > 0) {
+				// Set to the first available model
+				value = filteredItems[0].value;
+				dispatch('change', { value });
+			}
+		}
 		resetView();
 	}
 
