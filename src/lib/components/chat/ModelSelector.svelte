@@ -2,7 +2,7 @@
 	import { models, showSettings, settings, user, mobile, config } from '$lib/stores';
 	import { onMount, tick, getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import Selector from './ModelSelector/Selector.svelte';
+	import Selector from '$gclib/components/chat/ModelSelector/Selector.svelte';
 	import Tooltip from '../common/Tooltip.svelte';
 
 	import { updateUserSettings } from '$lib/apis/users';

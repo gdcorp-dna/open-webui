@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 
 	import MenuLines from '$lib/components/icons/MenuLines.svelte';
-	import UserMenu from '$lib/components/layout/Sidebar/UserMenu.svelte';
+	import UserMenu from '$gclib/components/layout/Sidebar/UserMenu.svelte';
 
 	const i18n = getContext('i18n');
 

@@ -25,7 +25,7 @@
 	import { flyAndScale } from '$lib/utils/transitions';
 
 	import Dropdown from '$lib/components/common/Dropdown.svelte';
-	import Tags from '$lib/components/chat/Tags.svelte';
+	import Tags from '$gclib/components/common/Tags.svelte';
 	import Map from '$lib/components/icons/Map.svelte';
 	import Clipboard from '$lib/components/icons/Clipboard.svelte';
 	import AdjustmentsHorizontal from '$lib/components/icons/AdjustmentsHorizontal.svelte';

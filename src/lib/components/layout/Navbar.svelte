@@ -20,7 +20,7 @@
 	import Tooltip from '../common/Tooltip.svelte';
 	import Menu from './Navbar/Menu.svelte';
 	import { page } from '$app/stores';
-	import UserMenu from './Sidebar/UserMenu.svelte';
+	import UserMenu from '$gclib/components/layout/Sidebar/UserMenu.svelte';
 	import MenuLines from '../icons/MenuLines.svelte';
 	import AdjustmentsHorizontal from '../icons/AdjustmentsHorizontal.svelte';
 	import Map from '../icons/Map.svelte';
