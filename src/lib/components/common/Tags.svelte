@@ -1,6 +1,6 @@
 <script lang="ts">
 	import TagInput from './Tags/TagInput.svelte';
-	import TagList from '$gclib/components/common/Tags/TagList.svelte';
+	import TagList from './Tags/TagList.svelte';
 	import { getContext, createEventDispatcher } from 'svelte';
 	const dispatch = createEventDispatcher();
 
