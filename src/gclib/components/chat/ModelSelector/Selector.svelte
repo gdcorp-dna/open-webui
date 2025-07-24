@@ -19,7 +19,8 @@
 		mobile,
 		temporaryChatEnabled,
 		settings,
-		config
+		config,
+		sdmMode
 	} from '$lib/stores';
 	import { toast } from 'svelte-sonner';
 	import { capitalizeFirstLetter, sanitizeResponseContent, splitStream } from '$lib/utils';
@@ -130,11 +131,31 @@
 							return item.model?.direct;
 						}
 					})
-	).filter((item) => !(item.model?.info?.meta?.hidden ?? false));
+	).filter((item) => {
+		// Filter out hidden models
+		if (item.model?.info?.meta?.hidden ?? false) return false;
+		// If SDM mode is enabled, only show models tagged with sdmEnabled
+		if ($sdmMode && !(item.model?.info?.meta?.capabilities?.sdmEnabled ?? false)) return false;
+		return true;
+	});
 
-	$: if (selectedTag || selectedConnectionType) {
+	$: if (selectedTag || selectedConnectionType || $sdmMode !== undefined) {
 		resetView();
 	} else {
+		resetView();
+	}
+
+	// Watch for changes to sdmMode and update the model selection if needed
+	$: if ($sdmMode !== undefined) {
+		// Check if the currently selected model is still available in filtered items
+		if (value && filteredItems.findIndex(item => item.value === value) === -1) {
+			// Selected model is no longer in the filtered list
+			if (filteredItems.length > 0) {
+				// Set to the first available model
+				value = filteredItems[0].value;
+				dispatch('change', { value });
+			}
+		}
 		resetView();
 	}
 

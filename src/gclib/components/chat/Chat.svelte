@@ -36,7 +36,8 @@
 		chatTitle,
 		showArtifacts,
 		tools,
-		toolServers
+		toolServers,
+		sdmMode
 	} from '$lib/stores';
 	import {
 		convertMessagesToHistory,
@@ -80,15 +81,15 @@
 	} from '$lib/apis';
 	import { getTools } from '$lib/apis/tools';
 
-	import Banner from '../common/Banner.svelte';
+	import Banner from '$lib/components/common/Banner.svelte';
 	import MessageInput from '$lib/components/chat/MessageInput.svelte';
 	import Messages from '$lib/components/chat/Messages.svelte';
 	import Navbar from '$lib/components/chat/Navbar.svelte';
-	import ChatControls from './ChatControls.svelte';
-	import EventConfirmDialog from '../common/ConfirmDialog.svelte';
-	import Placeholder from './Placeholder.svelte';
-	import NotificationToast from '../NotificationToast.svelte';
-	import Spinner from '../common/Spinner.svelte';
+	import ChatControls from '$lib/components/chat/ChatControls.svelte';
+	import EventConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
+	import Placeholder from '$lib/components/chat/Placeholder.svelte';
+	import NotificationToast from '$lib/components/NotificationToast.svelte';
+	import Spinner from '$lib/components/common/Spinner.svelte';
 	import { fade } from 'svelte/transition';
 
 	export let chatIdProp = '';
@@ -128,6 +129,15 @@
 
 	let chat = null;
 	let tags = [];
+
+	let chatRequireSdmMode = false;
+	let showSdmWarning = false;
+
+	// Watch for changes to sdmMode
+	$: if ($sdmMode !== undefined && chatRequireSdmMode) {
+		// Update SDM warning visibility when SDM mode changes
+		showSdmWarning = !$sdmMode;
+	}
 
 	let history = {
 		messages: {},
@@ -858,6 +868,11 @@
 
 			if (chatContent) {
 				console.log(chatContent);
+
+				// Check if chat was created with SDM mode on
+				chatRequireSdmMode = chatContent?.metadata?.sdmMode === true;
+				// Check current SDM mode setting and show warning if needed
+				showSdmWarning = chatRequireSdmMode && !$sdmMode;
 
 				selectedModels =
 					(chatContent?.models ?? undefined) !== undefined
@@ -1931,7 +1946,10 @@
 				history: history,
 				messages: createMessagesList(history, history.currentId),
 				tags: [],
-				timestamp: Date.now()
+				timestamp: Date.now(),
+				metadata: {
+					sdmMode: $sdmMode
+				}
 			});
 
 			_chatId = chat.id;
@@ -1958,7 +1976,10 @@
 					history: history,
 					messages: createMessagesList(history, history.currentId),
 					params: params,
-					files: chatFiles
+					files: chatFiles,
+					metadata: {
+						sdmMode: $sdmMode
+					}
 				});
 				currentChatPage.set(1);
 				await chats.set(await getChatList(localStorage.token, $currentChatPage));
@@ -2003,7 +2024,7 @@
 	id="chat-container"
 >
 	{#if !loading}
-		<div in:fade={{ duration: 50 }} class="w-full h-full flex flex-col">
+		<div in:fade={{ duration: 50 }} class="w-full h-full flex flex-col relative">
 			{#if $settings?.backgroundImageUrl ?? null}
 				<div
 					class="absolute {$showSidebar
@@ -2017,7 +2038,20 @@
 				/>
 			{/if}
 
-			<PaneGroup direction="horizontal" class="w-full h-full">
+			{#if showSdmWarning && chatRequireSdmMode}
+				<div in:fade={{ duration: 150 }} class="absolute inset-0 bg-black/50 backdrop-blur-sm z-40"></div>
+				<Banner
+					banner={{
+						type: 'warning',
+						title: 'SDM Mode Required',
+						content: $i18n.t('This chat was created with SDM Mode enabled. To view this chat, please enable SDM Mode in your user settings.'),
+						dismissable: false
+					}}
+					className="absolute top-4 left-4 right-4 z-50 max-w-3xl mx-auto"
+				/>
+			{/if}
+
+			<PaneGroup direction="horizontal" class="w-full h-full  {chatRequireSdmMode && !$sdmMode ? 'opacity-20' : ''}">
 				<Pane defaultSize={50} class="h-full flex relative max-w-full flex-col">
 					<Navbar
 						bind:this={navbarElement}

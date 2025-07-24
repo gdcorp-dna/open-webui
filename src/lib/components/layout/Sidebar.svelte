@@ -44,7 +44,7 @@
 	import { WEBUI_BASE_URL } from '$lib/constants';
 
 	import ArchivedChatsModal from './ArchivedChatsModal.svelte';
-	import UserMenu from './Sidebar/UserMenu.svelte';
+	import UserMenu from '$gclib/components/layout/Sidebar/UserMenu.svelte';
 	import ChatItem from './Sidebar/ChatItem.svelte';
 	import Spinner from '../common/Spinner.svelte';
 	import Loader from '../common/Loader.svelte';
