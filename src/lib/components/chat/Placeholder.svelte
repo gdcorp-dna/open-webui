@@ -229,7 +229,7 @@
 					{transparentBackground}
 					{stopResponse}
 					{createMessagePair}
-					placeholder={$i18n.t('Can I help you?')}
+					placeholder={$i18n.t('How can I be of help today?')}
 					onChange={(input) => {
 						if (!$temporaryChatEnabled) {
 							if (input.prompt !== null) {
