@@ -67,6 +67,7 @@ from open_webui.retrieval.web.perplexity import search_perplexity
 from open_webui.retrieval.web.sougou import search_sougou
 from open_webui.retrieval.web.firecrawl import search_firecrawl
 from open_webui.retrieval.web.external import search_external
+from open_webui.retrieval.web.external_utils import call_external_api
 
 from open_webui.retrieval.utils import (
     get_embedding_function,
@@ -1914,25 +1915,34 @@ async def process_web_search(
         logging.info(
             f"trying to web search with {request.app.state.config.WEB_SEARCH_ENGINE, form_data.queries}"
         )
-
-        search_tasks = [
-            run_in_threadpool(
-                search_web,
-                request,
-                request.app.state.config.WEB_SEARCH_ENGINE,
-                query,
-            )
-            for query in form_data.queries
-        ]
+        # replace with actual user_message :  challenge as an argument need to pass from middleware.py(chat_web_search_handler) to the function
+        query_to_use = form_data.queries[0]
+        if "/responses" in request.app.state.config.EXTERNAL_WEB_SEARCH_URL:
+            search_tasks = [
+                run_in_threadpool(
+                    call_external_api,
+                    query_to_use,
+                    request,
+                )
+            ]
+        else:
+            search_tasks = [
+                run_in_threadpool(
+                    search_web,
+                    request,
+                    request.app.state.config.WEB_SEARCH_ENGINE,
+                    query,
+                )
+                for query in form_data.queries
+            ]
 
         search_results = await asyncio.gather(*search_tasks)
 
         for result in search_results:
             if result:
                 for item in result:
-                    if item and item.link:
-                        urls.append(item.link)
-
+                    if item and 'link' in item:
+                        urls.append(item['link'])
         urls = list(dict.fromkeys(urls))
         log.debug(f"urls: {urls}")
 
