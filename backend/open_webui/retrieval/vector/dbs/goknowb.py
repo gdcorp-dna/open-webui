@@ -60,11 +60,6 @@ class KBStrategy(str, Enum):
     KNOWB003 = "KNOWB003"  # Fixed-size chunking (500 tokens)
     OPENWEBUI = "OPENWEBUI" # No chunking
 
-class SearchType(str, Enum):
-    LEXICAL_AND_SEMANTIC = "lexical_and_semantic"
-    SEMANTIC = "semantic"
-    AUTO = "auto"
-
 class QueryDocForm(BaseModel):
     collection_name: str
     query: str
@@ -423,6 +418,10 @@ class KnowledgeBaseClient:
 
         if score_threshold is not None and (score_threshold < 0.0 or score_threshold > 1.0):
             raise ValueError("scoreThreshold must be between 0 and 1")
+
+        # Validate search_type is a proper enum
+        if not isinstance(search_type, SearchType):
+            raise ValueError(f"search_type must be a SearchType enum, got {type(search_type)}")
 
         # Prepare request body according to API specification
         request_body = {
@@ -1024,6 +1023,8 @@ class GoKnowbClient(VectorDBBase):
                 
             if search_type is None:
                 search_type = SearchType.SEMANTIC
+            elif not isinstance(search_type, SearchType):
+                raise ValueError(f"search_type must be a SearchType enum, got {type(search_type)}")
                 
             if score_threshold is None:
                 score_threshold = 0.1

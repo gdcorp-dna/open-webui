@@ -24,6 +24,9 @@ from open_webui.models.notes import Notes
 from open_webui.retrieval.vector.main import GetResult
 from open_webui.utils.access_control import has_access
 
+# Import SearchType enum for GoKnowB
+from open_webui.retrieval.vector.dbs.goknowb import SearchType
+
 
 from open_webui.env import (
     SRC_LOG_LEVELS,
@@ -287,9 +290,13 @@ def query_collection(
                     result =  VECTOR_DB_CLIENT.search_text(
                     collection_names=[collection_name], query=query_embedding,
                     limit=k,
-                    search_type="SEMANTIC")
-                    log.info(f"query_collection:result {result.ids} {result.metadatas}")
-                    return result.model_dump(), None
+                    search_type=SearchType.SEMANTIC)
+                    if result is not None:
+                        log.info(f"query_collection:result {result.ids} {result.metadatas}")
+                        return result.model_dump(), None
+                    else:
+                        log.warning(f"Search returned None for collection {collection_name}")
+                        return None, None
                            
                 result = query_doc(
                     collection_name=collection_name,
