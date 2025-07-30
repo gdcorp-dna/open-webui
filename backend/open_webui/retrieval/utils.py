@@ -44,6 +44,7 @@ from typing import Any
 
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.retrievers import BaseRetriever
+GOKNOWB_ENABLED = (VECTOR_DB == "goknowb")
 
 
 class VectorSearchRetriever(BaseRetriever):
@@ -282,6 +283,14 @@ def query_collection(
     def process_query_collection(collection_name, query_embedding):
         try:
             if collection_name:
+                if GOKNOWB_ENABLED:
+                    result =  VECTOR_DB_CLIENT.search_text(
+                    collection_names=[collection_name], query=query_embedding,
+                    limit=k,
+                    search_type="SEMANTIC")
+                    log.info(f"query_collection:result {result.ids} {result.metadatas}")
+                    return result.model_dump(), None
+                           
                 result = query_doc(
                     collection_name=collection_name,
                     k=k,
@@ -294,8 +303,10 @@ def query_collection(
             log.exception(f"Error when querying the collection: {e}")
             return None, e
 
-    # Generate all query embeddings (in one call)
+    # Generate all query embeddings (in one call)    
     query_embeddings = embedding_function(queries, prefix=RAG_EMBEDDING_QUERY_PREFIX)
+    if GOKNOWB_ENABLED:
+        query_embeddings = queries
     log.debug(
         f"query_collection: processing {len(queries)} queries across {len(collection_names)} collections"
     )
