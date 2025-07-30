@@ -65,6 +65,14 @@ class SearchType(str, Enum):
     SEMANTIC = "semantic"
     AUTO = "auto"
 
+class QueryDocForm(BaseModel):
+    collection_name: str
+    query: str
+    k: Optional[int] = None
+    k_reranker: Optional[int] = None
+    r: Optional[float] = None
+    hybrid: Optional[bool] = None
+
 
 @dataclass
 class AllowedPrincipal:
@@ -1234,7 +1242,7 @@ class GoKnowbClient(VectorDBBase):
             log.exception(e)
             raise e
 
-    def query_doc_handler(self, request: Request, form_data: QueryDocForm, user: User) -> Optional[GetResult]:
+    def query_doc_handler(self, request: Request, form_data: QueryDocForm) -> Optional[GetResult]:
         try:
             search_type = SearchType.SEMANTIC
             r = 0.0
