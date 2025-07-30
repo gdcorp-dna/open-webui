@@ -1139,7 +1139,11 @@ class GoKnowbClient(VectorDBBase):
             # Based on the logs, KB nodes are created using file-based structure
             # Create file-based paths for both regular and full search collections
             file_based_search_path = f"open_webui/file-{file_id}"
-            file_name = Files.get_file_by_id(file_id).name
+            file_obj = Files.get_file_by_id(file_id)
+            if file_obj is None:
+                log.warning(f"File with ID {file_id} not found")
+                return
+            file_name = file_obj.filename
             collection_based_search_path = f"open_webui/{collection_name}/{file_id}_{file_name}"
             #file_based_full_search_path = f"open_webui/full_search/file-{file_id}"
             
