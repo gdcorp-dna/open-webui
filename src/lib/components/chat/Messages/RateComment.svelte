@@ -3,7 +3,7 @@
 
 	import { createEventDispatcher, onMount, getContext } from 'svelte';
 	import { config, models } from '$lib/stores';
-	import Tags from '$lib/components/common/Tags.svelte';
+	import Tags from '../../../../gclib/components/common/Tags.svelte';
 	import XMark from '$lib/components/icons/XMark.svelte';
 
 	const i18n = getContext('i18n');

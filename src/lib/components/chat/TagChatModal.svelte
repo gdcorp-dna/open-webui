@@ -2,7 +2,7 @@
 	import { getContext } from 'svelte';
 	import Modal from '../common/Modal.svelte';
 
-	import Tags from '../common/Tags.svelte';
+	import Tags from '../../../gclib/components/common/Tags.svelte';
 
 	const i18n = getContext('i18n');
 

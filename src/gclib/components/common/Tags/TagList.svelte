@@ -2,9 +2,9 @@
 	import { createEventDispatcher } from 'svelte';
 	import { getContext } from 'svelte';
 	const i18n = getContext('i18n');
-	import Tooltip from '../Tooltip.svelte';
+	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import XMark from '$lib/components/icons/XMark.svelte';
-	import Badge from '../Badge.svelte';
+	import Badge from '$lib/components/common/Badge.svelte';
 	const dispatch = createEventDispatcher();
 
 	export let tags = [];
