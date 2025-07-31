@@ -1,26 +1,14 @@
 <script lang="ts">
-	import TagInput from '$lib/components/common/Tags/TagInput.svelte';
-	import TagList from './Tags/TagList.svelte';
-	import { getContext, createEventDispatcher } from 'svelte';
-	const dispatch = createEventDispatcher();
-
-	const i18n = getContext('i18n');
+	import TagList from '$gclib/components/common/Tags/TagList.svelte';
 
 	export let tags = [];
 </script>
 
-<ul class="flex flex-row flex-wrap gap-1 line-clamp-1">
-	<TagList
-		{tags}
-		on:delete={(e) => {
-			dispatch('delete', e.detail);
-		}}
-	/>
+<!--
+	GoCaaS: https://godaddy-corp.atlassian.net/browse/GOCAAS-2625
+		Restrict usage of tags for models in favor of CI/CD driven configuration.
+-->
 
-	<TagInput
-		label={tags.length == 0 ? $i18n.t('Add Tags') : ''}
-		on:add={(e) => {
-			dispatch('add', e.detail);
-		}}
-	/>
-</ul>
+<div class="flex flex-row flex-wrap gap-1 line-clamp-1">
+	<TagList {tags} />
+</div>
