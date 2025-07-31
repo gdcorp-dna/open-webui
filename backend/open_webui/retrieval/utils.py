@@ -310,10 +310,11 @@ def query_collection(
             log.exception(f"Error when querying the collection: {e}")
             return None, e
 
-    # Generate all query embeddings (in one call)    
-    query_embeddings = embedding_function(queries, prefix=RAG_EMBEDDING_QUERY_PREFIX)
     if GOKNOWB_ENABLED:
         query_embeddings = queries
+    else:
+        # Generate all query embeddings (in one call)    
+        query_embeddings = embedding_function(queries, prefix=RAG_EMBEDDING_QUERY_PREFIX)
     log.debug(
         f"query_collection: processing {len(queries)} queries across {len(collection_names)} collections"
     )

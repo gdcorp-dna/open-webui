@@ -58,6 +58,7 @@ class KBStrategy(str, Enum):
     KNOWB001 = "KNOWB001"  # (default): Semantic chunking (500 tokens)
     KNOWB002 = "KNOWB002"  # No chunking
     KNOWB003 = "KNOWB003"  # Fixed-size chunking (500 tokens)
+    KNOWB004 = "KNOWB004"  # Fixed-size chunking (500 tokens)
     OPENWEBUI = "OPENWEBUI" # No chunking
 
 class QueryDocForm(BaseModel):
@@ -907,13 +908,6 @@ class GoKnowbClient(VectorDBBase):
                 log.info(f"✓ Successfully synced search KB node: {search_collection_name}")
             else:
                 log.warning(f"Sync failed for search KB node {search_collection_name}: {sync_result.status_code}")
-
-            # log.info(f"Syncing full search KB node: {full_search_collection_name}")
-            # sync_result = self.client.sync_kb(full_search_collection_name)
-            # if sync_result.status_code == 200:
-            #     log.info(f"✓ Successfully synced full search KB node: {full_search_collection_name}")
-            # else:
-            #     log.warning(f"Sync failed for full search KB node {full_search_collection_name}: {sync_result.status_code}")
 
             # Wait for KB node to be indexed
             if "file-" in search_collection_name:
