@@ -11,7 +11,7 @@
 	import SensitiveInput from '$lib/components/common/SensitiveInput.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Switch from '$lib/components/common/Switch.svelte';
-	import Tags from '../../gclib/components/common/Tags.svelte';
+	import Tags from './common/Tags.svelte';
 	import { getToolServerData } from '$lib/apis';
 	import { verifyToolServerConnection } from '$lib/apis/configs';
 	import AccessControl from './workspace/common/AccessControl.svelte';
