@@ -881,7 +881,7 @@ class GoKnowbClient(VectorDBBase):
                 kb_node_id=search_collection_name,
                 resource_type=KBNodeType.DOCUMENT,
                 files=[file_full_path],
-                kb_strategy=KBStrategy.KNOWB003,
+                kb_strategy=KBStrategy.KNOWB004,
             )
             log.info(f"Create KB node result: {result}")
             if result.status_code != 202:
