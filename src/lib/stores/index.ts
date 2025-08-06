@@ -81,6 +81,7 @@ export const showCallOverlay = writable(false);
 export const artifactCode = writable(null);
 
 export const temporaryChatEnabled = writable(false);
+export const isSDMEnabled = writable(false);
 export const scrollPaginationEnabled = writable(false);
 export const currentChatPage = writable(1);
 
@@ -197,6 +198,7 @@ type Settings = {
 	num_batch?: string;
 	num_keep?: string;
 	options?: ModelOptions;
+	sdmMode?: boolean;
 };
 
 type ModelOptions = {
