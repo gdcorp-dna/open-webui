@@ -337,11 +337,17 @@ class KnowledgeBaseClient:
             files_data = []
             for file_full_path in files:
                 try:
+                    # Open file and let requests handle MIME type detection
+                    # file = Files.get_file_by_id(file_id)
                     file_path = Storage.get_file(file_full_path)
                     file_path = Path(file_path)
                     files_data.append(('files', open(file_path, 'rb')))
-                except Exception as e:
-                    log.error(f"Failed to process file {file_full_path}: {e}")
+                except IOError as e:
+                    log.error(f"Failed to open file {file_path}: {e}")
+                    # Close any already opened files
+                    for _, opened_file in files_data:
+                        opened_file.close()
+                    raise ValueError(f"Cannot open file: {file_path}")
 
         # Log request for debugging
         url = f"{self.base_url}/v1/kbnodes"
