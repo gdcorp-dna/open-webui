@@ -614,18 +614,6 @@ class GoKnowbClient(VectorDBBase):
                                     # Include all the original file metadata
                                     **file.meta,
                                 })
-                                
-                                # Try to get the original metadata that was stored during insertion
-                                # This would include file_content, file_content_encoding, etc.
-                                # Since GoKnowB doesn't store this in the search results directly,
-                                # we'll need to reconstruct it from the file if needed
-                                try:
-                                    # For now, we'll include the basic file info
-                                    # In a future enhancement, we could store additional metadata
-                                    # in a separate metadata field or retrieve it from the original file
-                                    pass
-                                except Exception as e:
-                                    log.debug(f"Could not retrieve additional metadata for file {file_id}: {e}")
                             else:
                                 log.warning(f"File with ID {file_id} not found in database")
                         else:
@@ -838,9 +826,7 @@ class GoKnowbClient(VectorDBBase):
             log.info(f"Deleting search collection: {search_collection_name}")
             result = self.client.delete_kbnode(search_collection_name)
             log.info(f"Search collection delete result: {result.status_code}")
-            #log.info(f"Deleting full search collection: {full_search_collection_name}")
-            #result = self.client.delete_kbnode(full_search_collection_name)
-            #log.info(f"Full search collection delete result: {result.status_code}")
+
             if result.status_code != 200:
                 raise Exception(f" API response: {result}")
             log.info(f"Successfully deleted collection_name: {collection_name}")
@@ -889,17 +875,10 @@ class GoKnowbClient(VectorDBBase):
             log.info(f"✓ Successfully created search KB node: {search_collection_name}")
             log.info(f"Successfully created file KB node: {search_collection_name}")
 
-            # log.info(f"Creating full search KB node: {full_search_collection_name}")
-            # result = self.client.create_kbnode_with_file(
-            #     kb_node_id=full_search_collection_name,
-            #     resource_type=KBNodeType.DOCUMENT,
-            #     files=[file_full_path],
-            #     kb_strategy=KBStrategy.OPENWEBUI,
-
-            # )
+          
             if result.status_code != 202:
                 raise Exception(f" API response: {result}")
-            #log.info(f"Successfully created full search KB node: {full_search_collection_name}")
+
 
             # Sync both KB nodes after creation
             log.info(f"Syncing search KB node: {search_collection_name}")
@@ -932,6 +911,7 @@ class GoKnowbClient(VectorDBBase):
                 else:
                     log.warning(f"✗ Indexing failed or timed out after {indexing_duration:.2f} seconds")
             else:
+
                 log.info(f"Skipping indexing check - no 'file-' in collection name: {search_collection_name}")
                 search_indexed = True
             
@@ -956,12 +936,9 @@ class GoKnowbClient(VectorDBBase):
     ) -> Optional[SearchResult]:
         """Search for similar vectors in a collection."""
         try:
-            # For GoKnowB, we need to convert vector search to text search
-            # Since we don't have a direct vector-to-text conversion, we'll use a generic search
-            # In a real implementation, you might want to implement proper vector-to-text conversion
-            query = "semantic search query"  # This could be enhanced with vector-to-text conversion
+
+            query = "semantic search query"
             
-            # Convert collection name to full search path for better results
             search_collection_name = self._update_collection_name(collection_name)
             kb_node_ids = [search_collection_name]
                 
@@ -1068,23 +1045,6 @@ class GoKnowbClient(VectorDBBase):
         """Query vectors from a collection using metadata filter."""
         pass
 
-    # def queryByCollectionNameAndFileId(
-    #         self, collection_name: str, file_full_name: str, limit: Optional[int] = 5
-    # ) -> Optional[GetResult]:
-    #     """Query vectors from a collection using metadata filter."""
-    #     # Get the actual collection name from file metadata
-    #     full_search_collection_name = self._update_collection_name_full_search(collection_name)
-        
-    #     log.info(f"Querying file {file_full_name} from collection {collection_name}")
-    #     log.info(f"Full search collection path: {full_search_collection_name}")
-        
-    #     # TODO YATIN: implement when we have provision to fetch all doc for a file in a collection
-    #     return self.search_text(
-    #         collection_names=[full_search_collection_name+"/"+file_full_name], 
-    #         limit=limit, 
-    #         score_threshold=0.0
-    #     )
-
 
     def get(self, collection_name: str) -> Optional[GetResult]:
         """Retrieve all vectors from a collection."""
@@ -1139,14 +1099,11 @@ class GoKnowbClient(VectorDBBase):
                 return
             file_name = file_obj.filename
             collection_based_search_path = f"open_webui/{collection_name}/{file_id}_{file_name}"
-            #file_based_full_search_path = f"open_webui/full_search/file-{file_id}"
             
             log.info(f"Collection name: {collection_name}")
             log.info(f"Deleting file {file_id} from collection {collection_name}")
             log.info(f"File-based search path: {file_based_search_path}")
-            #log.info(f"File-based full search path: {file_based_full_search_path}")
-            
-            # Delete from regular collection
+          
             try:
                 result = self.client.delete_kbnode(file_based_search_path)
                 if result.status_code == 200:
