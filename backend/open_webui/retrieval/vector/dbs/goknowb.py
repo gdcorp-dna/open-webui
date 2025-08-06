@@ -338,16 +338,32 @@ class KnowledgeBaseClient:
             for file_full_path in files:
                 try:
                     # Open file and let requests handle MIME type detection
-                    # file = Files.get_file_by_id(file_id)
-                    file_path = Storage.get_file(file_full_path)
-                    file_path = Path(file_path)
+                    file_id = self._get_file_id_from_file_path(file_full_path)
+                    file = Files.get_file_by_id(file_id)
+                    log.info(f"File object: {file}")
+                    if file and file.meta and file.meta.get('local_path'):
+                        file_path = file.meta.get('local_path')
+                        log.info(f"File path: {file_path}")
+                    else:
+                        log.info(f"File not found in database or no local_path, getting from storage")
+                        file_path = Storage.get_file(file_full_path)
+                        if file_path:
+                            file_path = Path(file_path)
+                            # Update the file record with the local path if we have a file object
+                            if file:
+                                Files.update_file_metadata_by_id(file_id, {
+                                    'local_path': str(file_path)
+                                })
+                        else:
+                            raise ValueError(f"Could not retrieve file from storage: {file_full_path}")
                     files_data.append(('files', open(file_path, 'rb')))
-                except IOError as e:
-                    log.error(f"Failed to open file {file_path}: {e}")
+                except Exception as e:
+                    log.error(f"Failed to process file {file_full_path}: {e}")
                     # Close any already opened files
-                    for _, opened_file in files_data:
-                        opened_file.close()
-                    raise ValueError(f"Cannot open file: {file_path}")
+                    if files_data:
+                        for _, opened_file in files_data:
+                            opened_file.close()
+                    raise ValueError(f"Failed to process file: {file_full_path} - {e}")
 
         # Log request for debugging
         url = f"{self.base_url}/v1/kbnodes"
@@ -479,6 +495,18 @@ class KnowledgeBaseClient:
 
         response = self._make_request_with_retry("GET", url)
         return self._handle_response(response, request_id)
+
+    def _get_file_id_from_file_path(self, file_full_path: str) -> str:
+        """Extract file ID from file path."""
+        try:
+            # Extract filename from path
+            filename = Path(file_full_path).name
+            # File ID is the part before the first underscore
+            file_id = filename.split('_')[0] if '_' in filename else filename
+            return file_id
+        except Exception as e:
+            log.warning(f"Could not extract file ID from path {file_full_path}: {e}")
+            return "unknown"
 
 
 class GoKnowbClient(VectorDBBase):
@@ -817,6 +845,31 @@ class GoKnowbClient(VectorDBBase):
         log.warning(f"Timeout waiting for {node_type} KB node to be indexed: {kb_node_id}")
         return False
 
+    def _get_file_id_from_file_path(self, file_full_path: str) -> str:
+        """Extract file ID from file path."""
+        try:
+            # Extract filename from path
+            filename = Path(file_full_path).name
+            # File ID is the part before the first underscore
+            file_id = filename.split('_')[0] if '_' in filename else filename
+            return file_id
+        except Exception as e:
+            log.warning(f"Could not extract file ID from path {file_full_path}: {e}")
+            return "unknown"
+
+    def _get_upload_source_from_file(self, file_full_path: str) -> str:
+        """Get the upload source from file metadata."""
+        try:
+            file_id = self._get_file_id_from_file_path(file_full_path)
+            file_obj = Files.get_file_by_id(file_id)
+            if file_obj and file_obj.meta and file_obj.meta.get('data', {}).get('upload_source'):
+                return file_obj.meta['data']['upload_source']
+            else:
+                return "unknown"
+        except Exception as e:
+            log.warning(f"Could not determine upload source: {e}")
+            return "unknown"
+
     def _time_indexing_process(self, kb_node_path: str) -> tuple[bool, float]:
         """Time the indexing process and return success status and duration."""
         indexing_start_time = time.time()
@@ -870,12 +923,17 @@ class GoKnowbClient(VectorDBBase):
         #full_search_collection_name = self._update_collection_name_full_search(collection_name)
         search_collection_name = self._update_collection_name(collection_name)
         
-        log.info(f"Creating KB nodes for collection: {collection_name}")
-        log.info(f"File path: {file_full_path}")
-        log.info(f"Search collection KB node ID: {search_collection_name}")
-        #log.info(f"Full search collection KB node ID: {full_search_collection_name}")
-        
         try:
+            log.info(f"Creating KB nodes for collection: {collection_name}")
+            log.info(f"File path: {file_full_path}")
+            log.info(f"Search collection KB node ID: {search_collection_name}")
+            
+            # Check if we have upload source information in the file metadata
+            upload_source = self._get_upload_source_from_file(file_full_path)
+            log.info(f"File upload source: {upload_source}")
+            
+            #log.info(f"Full search collection KB node ID: {full_search_collection_name}")
+            
             log.info(f"Creating search KB node: {search_collection_name}")
             result = self.client.create_kbnode_with_file(
                 kb_node_id=search_collection_name,
@@ -906,7 +964,11 @@ class GoKnowbClient(VectorDBBase):
             file_id = file_name.split('_')[0] if '_' in file_name else file_name
             kb_node_path = f"{search_collection_name}/{file_name}"
             log.info(f"Checking indexing status for KB node: {kb_node_path}")
-            search_indexed, indexing_duration = self._time_indexing_process(kb_node_path)
+            if (upload_source == "knowledge" and "file-" not in search_collection_name) or \
+                (upload_source == "chat" and "file-" in search_collection_name):
+                search_indexed, indexing_duration = self._time_indexing_process(kb_node_path)
+            else:
+                search_indexed = True
 
             
             if not search_indexed:

@@ -530,13 +530,16 @@
 		if (!$temporaryChatEnabled) {
 			try {
 				// If the file is an audio file, provide the language for STT.
-				let metadata = null;
+				let metadata = {
+					upload_source: 'chat'
+				};
 				if (
 					(file.type.startsWith('audio/') || file.type.startsWith('video/')) &&
 					$settings?.audio?.stt?.language
 				) {
 					metadata = {
-						language: $settings?.audio?.stt?.language
+						language: $settings?.audio?.stt?.language,
+						upload_source: 'chat'
 					};
 				}
 
