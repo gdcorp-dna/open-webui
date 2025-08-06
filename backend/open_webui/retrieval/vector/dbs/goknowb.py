@@ -817,6 +817,20 @@ class GoKnowbClient(VectorDBBase):
         log.warning(f"Timeout waiting for {node_type} KB node to be indexed: {kb_node_id}")
         return False
 
+    def _time_indexing_process(self, kb_node_path: str) -> tuple[bool, float]:
+        """Time the indexing process and return success status and duration."""
+        indexing_start_time = time.time()
+        search_indexed = self._wait_for_kbnode_indexing(kb_node_path, "Search")
+        indexing_end_time = time.time()
+        indexing_duration = indexing_end_time - indexing_start_time
+        
+        if search_indexed:
+            log.info(f"✓ Indexing completed successfully in {indexing_duration:.2f} seconds")
+        else:
+            log.warning(f"✗ Indexing failed or timed out after {indexing_duration:.2f} seconds")
+        
+        return search_indexed, indexing_duration
+
     def delete_collection(self, collection_name: str) -> None:
         """Delete a collection from the vector DB."""
         try:
@@ -888,35 +902,15 @@ class GoKnowbClient(VectorDBBase):
             else:
                 log.warning(f"Sync failed for search KB node {search_collection_name}: {sync_result.status_code}")
 
-            # Wait for KB node to be indexed
-            if "file-" in search_collection_name:
-                # Extract file ID from the file path
-                file_name = Path(file_full_path).name
-                # The file ID is the part before the first underscore
-                file_id = file_name.split('_')[0] if '_' in file_name else file_name
-                
-                # Construct the proper KB node path for checking indexing status
-                # Use just the original filename, not the file_id + filename
-                kb_node_path = f"{search_collection_name}/{file_name}"
-                log.info(f"Checking indexing status for KB node: {kb_node_path}")
-                
-                # Start timing the indexing process
-                indexing_start_time = time.time()
-                search_indexed = self._wait_for_kbnode_indexing(kb_node_path, "Search")
-                indexing_end_time = time.time()
-                indexing_duration = indexing_end_time - indexing_start_time
-                
-                if search_indexed:
-                    log.info(f"✓ Indexing completed successfully in {indexing_duration:.2f} seconds")
-                else:
-                    log.warning(f"✗ Indexing failed or timed out after {indexing_duration:.2f} seconds")
-            else:
+            file_name = Path(file_full_path).name
+            file_id = file_name.split('_')[0] if '_' in file_name else file_name
+            kb_node_path = f"{search_collection_name}/{file_name}"
+            log.info(f"Checking indexing status for KB node: {kb_node_path}")
+            search_indexed, indexing_duration = self._time_indexing_process(kb_node_path)
 
-                log.info(f"Skipping indexing check - no 'file-' in collection name: {search_collection_name}")
-                search_indexed = True
             
             if not search_indexed:
-                log.warning("KB node failed to index within timeout period")
+                raise Exception("KB node failed to index within timeout period")
             else:
                 log.info("✓ KB node indexed successfully")
 
