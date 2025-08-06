@@ -936,20 +936,24 @@ class GoKnowbClient(VectorDBBase):
                 raise Exception(f" API response: {result}")
 
 
-            # Sync both KB nodes after creation
-            log.info(f"Syncing search KB node: {search_collection_name}")
-            sync_result = self.client.sync_kb("/" + search_collection_name)
-            if sync_result.status_code == 202:
-                log.info(f"✓ Successfully synced search KB node: {search_collection_name}")
-            else:
-                log.warning(f"Sync failed for search KB node {search_collection_name}: {sync_result.status_code}")
-
             file_name = Path(file_full_path).name
             file_id = file_name.split('_')[0] if '_' in file_name else file_name
             kb_node_path = f"{search_collection_name}/{file_name}"
             log.info(f"Checking indexing status for KB node: {kb_node_path}")
+            
+            # Only sync and check indexing for specific conditions
             if (upload_source == "knowledge" and "file-" not in search_collection_name) or \
                 (upload_source == "chat" and "file-" in search_collection_name):
+                
+                # Sync KB node before checking indexing
+                log.info(f"Syncing search KB node: {search_collection_name}")
+                sync_result = self.client.sync_kb("/" + search_collection_name)
+                if sync_result.status_code == 202:
+                    log.info(f"✓ Successfully synced search KB node: {search_collection_name}")
+                else:
+                    log.warning(f"Sync failed for search KB node {search_collection_name}: {sync_result.status_code}")
+                
+                # Check indexing status
                 search_indexed, indexing_duration = self._time_indexing_process(kb_node_path)
             else:
                 search_indexed = True
