@@ -338,32 +338,11 @@ class KnowledgeBaseClient:
             for file_full_path in files:
                 try:
                     # Open file and let requests handle MIME type detection
-                    file_id = self._get_file_id_from_file_path(file_full_path)
-                    file = Files.get_file_by_id(file_id)
-                    log.info(f"File object: {file}")
-                    if file and file.meta and file.meta.get('local_path'):
-                        file_path = file.meta.get('local_path')
-                        log.info(f"File path: {file_path}")
-                    else:
-                        log.info(f"File not found in database or no local_path, getting from storage")
-                        file_path = Storage.get_file(file_full_path)
-                        if file_path:
-                            file_path = Path(file_path)
-                            # Update the file record with the local path if we have a file object
-                            if file:
-                                Files.update_file_metadata_by_id(file_id, {
-                                    'local_path': str(file_path)
-                                })
-                        else:
-                            raise ValueError(f"Could not retrieve file from storage: {file_full_path}")
+                    file_path = Storage.get_file(file_full_path)
+                    file_path = Path(file_path)
                     files_data.append(('files', open(file_path, 'rb')))
                 except Exception as e:
                     log.error(f"Failed to process file {file_full_path}: {e}")
-                    # Close any already opened files
-                    if files_data:
-                        for _, opened_file in files_data:
-                            opened_file.close()
-                    raise ValueError(f"Failed to process file: {file_full_path} - {e}")
 
         # Log request for debugging
         url = f"{self.base_url}/v1/kbnodes"
