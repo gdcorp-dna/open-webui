@@ -337,7 +337,6 @@ class KnowledgeBaseClient:
             files_data = []
             for file_full_path in files:
                 try:
-                    # Open file and let requests handle MIME type detection
                     file_path = Storage.get_file(file_full_path)
                     file_path = Path(file_path)
                     files_data.append(('files', open(file_path, 'rb')))
