@@ -1,3 +1,4 @@
+export CORS_ALLOW_ORIGIN=http://localhost:5173/
 #!/bin/bash
 
 # Check if GoDaddy dependencies need to be installed
