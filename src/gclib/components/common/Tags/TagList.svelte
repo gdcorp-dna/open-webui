@@ -5,8 +5,8 @@
 </script>
 
 <!--
-	GoCaaS: https://godaddy-corp.atlassian.net/browse/GOCAAS-2625
-		Restrict usage of tags for models in favor of CI/CD driven configuration.
+  GoCaaS: https://godaddy-corp.atlassian.net/browse/GOCAAS-2625
+    Restrict usage of tags for models in favor of CI/CD driven configuration.
 -->
 
 {#each tags as tag}

@@ -198,7 +198,6 @@ type Settings = {
 	num_batch?: string;
 	num_keep?: string;
 	options?: ModelOptions;
-	sdmMode?: boolean;
 };
 
 type ModelOptions = {
