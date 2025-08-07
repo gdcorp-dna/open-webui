@@ -108,7 +108,7 @@ from open_webui.constants import ERROR_MESSAGES
 
 log = logging.getLogger(__name__)
 log.setLevel(SRC_LOG_LEVELS["RAG"])
-GOKNOWB_ENABLED = (VECTOR_DB == "goknowb")
+GOKNOWB_ENABLED = VECTOR_DB == "goknowb"
 
 ##########################################
 #
@@ -1121,7 +1121,10 @@ def save_docs_to_vector_db(
     user=None,
 ) -> bool:
     if GOKNOWB_ENABLED:
-        return VECTOR_DB_CLIENT.save_docs_to_vector_db(request, docs, collection_name, metadata, overwrite, split, add, user)
+        return VECTOR_DB_CLIENT.save_docs_to_vector_db(
+            request, docs, collection_name, metadata, overwrite, split, add, user
+        )
+
     def _get_docs_info(docs: list[Document]) -> str:
         docs_info = set()
 
@@ -2183,7 +2186,10 @@ def delete_entries_from_collection(form_data: DeleteForm, user=Depends(get_admin
             file = Files.get_file_by_id(form_data.file_id)
             hash = file.hash
             if GOKNOWB_ENABLED:
-                VECTOR_DB_CLIENT.delete_file(collection_name=form_data.collection_name, file_full_name=file.filename)
+                VECTOR_DB_CLIENT.delete_file(
+                    collection_name=form_data.collection_name,
+                    file_full_name=file.filename,
+                )
                 return {"status": True}
 
             VECTOR_DB_CLIENT.delete(

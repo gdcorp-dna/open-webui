@@ -47,7 +47,8 @@ from typing import Any
 
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.retrievers import BaseRetriever
-GOKNOWB_ENABLED = (VECTOR_DB == "goknowb")
+
+GOKNOWB_ENABLED = VECTOR_DB == "goknowb"
 
 
 class VectorSearchRetriever(BaseRetriever):
@@ -287,17 +288,23 @@ def query_collection(
         try:
             if collection_name:
                 if GOKNOWB_ENABLED:
-                    result =  VECTOR_DB_CLIENT.search_text(
-                    collection_names=[collection_name], query=query_embedding,
-                    limit=k,
-                    search_type=SearchType.SEMANTIC)
+                    result = VECTOR_DB_CLIENT.search_text(
+                        collection_names=[collection_name],
+                        query=query_embedding,
+                        limit=k,
+                        search_type=SearchType.SEMANTIC,
+                    )
                     if result is not None:
-                        log.info(f"query_collection:result {result.ids} {result.metadatas}")
+                        log.info(
+                            f"query_collection:result {result.ids} {result.metadatas}"
+                        )
                         return result.model_dump(), None
                     else:
-                        log.warning(f"Search returned None for collection {collection_name}")
+                        log.warning(
+                            f"Search returned None for collection {collection_name}"
+                        )
                         return None, None
-                           
+
                 result = query_doc(
                     collection_name=collection_name,
                     k=k,
@@ -313,8 +320,10 @@ def query_collection(
     if GOKNOWB_ENABLED:
         query_embeddings = queries
     else:
-        # Generate all query embeddings (in one call)    
-        query_embeddings = embedding_function(queries, prefix=RAG_EMBEDDING_QUERY_PREFIX)
+        # Generate all query embeddings (in one call)
+        query_embeddings = embedding_function(
+            queries, prefix=RAG_EMBEDDING_QUERY_PREFIX
+        )
     log.debug(
         f"query_collection: processing {len(queries)} queries across {len(collection_names)} collections"
     )

@@ -29,6 +29,7 @@ log.setLevel(SRC_LOG_LEVELS["RAG"])
 
 GOKNOWB_API_URL = os.environ.get("GOKNOWB_API_URL")
 
+
 # GoKnowB specific enums and models
 class PrincipalType(str, Enum):
     JOMAX = "jomax"
@@ -59,7 +60,8 @@ class KBStrategy(str, Enum):
     KNOWB002 = "KNOWB002"  # No chunking
     KNOWB003 = "KNOWB003"  # Fixed-size chunking (500 tokens)
     KNOWB004 = "KNOWB004"  # Fixed-size chunking (500 tokens)
-    OPENWEBUI = "OPENWEBUI" # No chunking
+    OPENWEBUI = "OPENWEBUI"  # No chunking
+
 
 class QueryDocForm(BaseModel):
     collection_name: str
@@ -95,7 +97,7 @@ class KnowledgeBaseClient:
 
     def __init__(self):
         """Initialize the Knowledge Base API client."""
-        self.base_url = GOKNOWB_API_URL.rstrip('/')
+        self.base_url = GOKNOWB_API_URL.rstrip("/")
         self._token_cache = {}
         self._token_lock = threading.Lock()
         self._last_token_refresh = 0
@@ -105,42 +107,58 @@ class KnowledgeBaseClient:
         """Generate a new JWT token."""
         # Get environment from ENVIRONMENT env var, default to dev-private
         gd_env = os.environ.get("ENVIRONMENT", "dev-private")
-        
+
         sso_host = {
             "dev-private": "sso.dev-godaddy.com",
             "dev": "sso.dev-godaddy.com",
             "test": "sso.test-godaddy.com",
             "prod": "sso.godaddy.com",
-        }.get(gd_env, "sso.dev-godaddy.com")  # Default to dev if unknown environment
-        
-        log.info(f"Generating SSO JWT token for environment: {gd_env}, using SSO host: {sso_host}")
-        
+        }.get(
+            gd_env, "sso.dev-godaddy.com"
+        )  # Default to dev if unknown environment
+
+        log.info(
+            f"Generating SSO JWT token for environment: {gd_env}, using SSO host: {sso_host}"
+        )
+
         try:
             sso_client = AwsIamAuthTokenClient(
-                sso_host=sso_host, refresh_min=45, primary_region="us-west-2", secondary_region="us-west-2"
+                sso_host=sso_host,
+                refresh_min=45,
+                primary_region="us-west-2",
+                secondary_region="us-west-2",
             )
             token = sso_client.token
-            log.info(f"Successfully generated SSO JWT token for environment {gd_env} using host {sso_host}: {token[:20]}...")
+            log.info(
+                f"Successfully generated SSO JWT token for environment {gd_env} using host {sso_host}: {token[:20]}..."
+            )
             return token
         except Exception as e:
-            log.error(f"Failed to generate SSO JWT token for environment {gd_env} using host {sso_host}: {e}")
+            log.error(
+                f"Failed to generate SSO JWT token for environment {gd_env} using host {sso_host}: {e}"
+            )
             raise
 
     def _get_cached_token(self) -> str:
         """Get a cached token or generate a new one if needed."""
         current_time = time.time()
-        
+
         with self._token_lock:
             # Check if we have a cached token and if it's still valid
-            if (self._token_cache.get('token') and 
-                current_time - self._last_token_refresh < self._token_refresh_interval):
-                log.debug(f"Using cached JWT token: {self._token_cache['token'][:20]}...")
-                return self._token_cache['token']
-            
+            if (
+                self._token_cache.get("token")
+                and current_time - self._last_token_refresh
+                < self._token_refresh_interval
+            ):
+                log.debug(
+                    f"Using cached JWT token: {self._token_cache['token'][:20]}..."
+                )
+                return self._token_cache["token"]
+
             # Generate new token
             log.info("Cached token expired or not available, generating new token")
             new_token = self._generate_token()
-            self._token_cache['token'] = new_token
+            self._token_cache["token"] = new_token
             self._last_token_refresh = current_time
             return new_token
 
@@ -149,7 +167,7 @@ class KnowledgeBaseClient:
         with self._token_lock:
             log.info("Forcing JWT token refresh")
             new_token = self._generate_token()
-            self._token_cache['token'] = new_token
+            self._token_cache["token"] = new_token
             self._last_token_refresh = time.time()
             return new_token
 
@@ -164,52 +182,64 @@ class KnowledgeBaseClient:
         """Get information about the current token cache state."""
         with self._token_lock:
             current_time = time.time()
-            token_age = current_time - self._last_token_refresh if self._last_token_refresh > 0 else None
+            token_age = (
+                current_time - self._last_token_refresh
+                if self._last_token_refresh > 0
+                else None
+            )
             return {
-                'has_token': 'token' in self._token_cache,
-                'token_age_seconds': token_age,
-                'token_refresh_interval': self._token_refresh_interval,
-                'token_expires_in': max(0, self._token_refresh_interval - token_age) if token_age is not None else None
+                "has_token": "token" in self._token_cache,
+                "token_age_seconds": token_age,
+                "token_refresh_interval": self._token_refresh_interval,
+                "token_expires_in": (
+                    max(0, self._token_refresh_interval - token_age)
+                    if token_age is not None
+                    else None
+                ),
             }
 
     def _get_headers(self) -> Dict[str, str]:
         """Get the headers for API requests."""
         sso_jwt_token = self._get_cached_token()
         log.debug(f"Using SSO JWT token for API requests: {sso_jwt_token[:20]}...")
-        headers = {
-            "Authorization": f"sso-jwt {sso_jwt_token}"
-        }
+        headers = {"Authorization": f"sso-jwt {sso_jwt_token}"}
         return headers
 
-    def _make_request_with_retry(self, method: str, url: str, **kwargs) -> requests.Response:
+    def _make_request_with_retry(
+        self, method: str, url: str, **kwargs
+    ) -> requests.Response:
         """Make an HTTP request with automatic token refresh on auth errors."""
         max_retries = 2
         retry_count = 0
-        
+
         while retry_count <= max_retries:
             try:
                 headers = self._get_headers()
-                kwargs['headers'] = headers
-                
+                kwargs["headers"] = headers
+
                 response = requests.request(method, url, **kwargs)
-                
+
                 # If we get an auth error (401/403), try refreshing the token once
                 if response.status_code in [401, 403] and retry_count < max_retries:
-                    log.warning(f"Authentication failed (status {response.status_code}), refreshing token and retrying")
+                    log.warning(
+                        f"Authentication failed (status {response.status_code}), refreshing token and retrying"
+                    )
                     self._refresh_token()
                     retry_count += 1
                     continue
-                
+
                 return response
-                
+
             except Exception as e:
                 if retry_count < max_retries:
-                    log.warning(f"Request failed, retrying ({retry_count + 1}/{max_retries}): {e}")
+                    log.warning(
+                        f"Request failed, retrying ({retry_count + 1}/{max_retries}): {e}"
+                    )
                     retry_count += 1
                     continue
                 else:
                     raise
-        
+
         # This should never be reached, but just in case
         raise Exception("Max retries exceeded")
 
@@ -217,7 +247,9 @@ class KnowledgeBaseClient:
         """Generate a unique request ID for tracing."""
         return str(uuid.uuid4())[:8]
 
-    def _log_request(self, method: str, url: str, data=None, files=None, request_id=None):
+    def _log_request(
+        self, method: str, url: str, data=None, files=None, request_id=None
+    ):
         """Log complete request information."""
         if not request_id:
             request_id = self._generate_request_id()
@@ -238,15 +270,19 @@ class KnowledgeBaseClient:
         log.debug(f"[{request_id}] === REQUEST END ===")
         return request_id
 
-    def _handle_response(self, response: requests.Response, request_id: str = None) -> GoKnowbApiResponse:
+    def _handle_response(
+        self, response: requests.Response, request_id: str = None
+    ) -> GoKnowbApiResponse:
         """Handle API response and return status code along with response JSON."""
         try:
             response_data = response.json()
         except ValueError:
-            response_data = {"error": {
-                "message": response.text or "No response content",
-                "type": "json_parse_error"
-            }}
+            response_data = {
+                "error": {
+                    "message": response.text or "No response content",
+                    "type": "json_parse_error",
+                }
+            }
 
         req_id = request_id or "unknown"
         log.debug(f"[{req_id}] === RESPONSE START ===")
@@ -254,12 +290,14 @@ class KnowledgeBaseClient:
         log.debug(f"[{req_id}] URL: {response.url}")
 
         if not response.ok:
-            if isinstance(response_data, dict) and 'error' in response_data:
-                error = response_data['error']
+            if isinstance(response_data, dict) and "error" in response_data:
+                error = response_data["error"]
                 log.warning(f"[{req_id}] ERROR RESPONSE:")
                 log.warning(f"[{req_id}]   Type: {error.get('type', 'Unknown')}")
-                log.warning(f"[{req_id}]   Message: {error.get('message', 'No message')}")
-                if 'error_code' in error:
+                log.warning(
+                    f"[{req_id}]   Message: {error.get('message', 'No message')}"
+                )
+                if "error_code" in error:
                     log.warning(f"[{req_id}]   Error Code: {error.get('error_code')}")
             else:
                 log.warning(f"[{req_id}] ERROR RESPONSE: {response_data}")
@@ -276,15 +314,15 @@ class KnowledgeBaseClient:
         result = self._handle_response(response, request_id)
         log.info(f"Get KBNode details response status: {result.status_code}")
         log.info(f"Get KBNode details response data: {result.data}")
-        return result.data.get('healthy', False)
+        return result.data.get("healthy", False)
 
     def create_kbnode_with_file(
-            self,
-            kb_node_id: str,
-            resource_type: KBNodeType,
-            files: Optional[List[str]] = None,
-            acl: Optional[ACL] = None,
-            kb_strategy: KBStrategy = KBStrategy.KNOWB001
+        self,
+        kb_node_id: str,
+        resource_type: KBNodeType,
+        files: Optional[List[str]] = None,
+        acl: Optional[ACL] = None,
+        kb_strategy: KBStrategy = KBStrategy.KNOWB001,
     ) -> GoKnowbApiResponse:
         """
         Create a new KBNode with file upload.
@@ -301,28 +339,26 @@ class KnowledgeBaseClient:
 
         # Prepare form data
         data = {
-            'kbNodeId': kb_node_id,
-            'resourceType': resource_type.value,
-            'kbStrategy': kb_strategy.value,
+            "kbNodeId": kb_node_id,
+            "resourceType": resource_type.value,
+            "kbStrategy": kb_strategy.value,
         }
 
         log.info(f"Creating KBNode with data: {data}")
 
         # Set default ACL if none provided
         if acl:
-            data['acl'] = {
-                'allowedPrincipals': [
-                    {
-                        'id': p.id,
-                        'type': p.type.value,
-                        'scope': p.scope.value
-                    }
+            data["acl"] = {
+                "allowedPrincipals": [
+                    {"id": p.id, "type": p.type.value, "scope": p.scope.value}
                     for p in acl.allowed_principals
                 ]
             }
         else:
             # Use default ACL as per API spec
-            data['acl'] = """{
+            data[
+                "acl"
+            ] = """{
                 "allowedPrincipals": [
                     {
                         "type": "jomax", 
@@ -341,7 +377,7 @@ class KnowledgeBaseClient:
                     # file = Files.get_file_by_id(file_id)
                     file_path = Storage.get_file(file_full_path)
                     file_path = Path(file_path)
-                    files_data.append(('files', open(file_path, 'rb')))
+                    files_data.append(("files", open(file_path, "rb")))
                 except IOError as e:
                     log.error(f"Failed to open file {file_path}: {e}")
                     # Close any already opened files
@@ -352,7 +388,7 @@ class KnowledgeBaseClient:
         # Log request for debugging
         url = f"{self.base_url}/v1/kbnodes"
         request_id = self._log_request("POST", url, data=data, files=files)
-        
+
         log.info(f"Creating KB node with ID: {kb_node_id}")
         log.info(f"Resource type: {resource_type.value}")
         log.info(f"KB strategy: {kb_strategy.value}")
@@ -360,10 +396,7 @@ class KnowledgeBaseClient:
 
         try:
             response = self._make_request_with_retry(
-                "POST",
-                url,
-                data=data,
-                files=files_data
+                "POST", url, data=data, files=files_data
             )
             result = self._handle_response(response, request_id)
             log.info(f"KB node creation response status: {result.status_code}")
@@ -400,12 +433,12 @@ class KnowledgeBaseClient:
         return result
 
     def search_kb(
-            self,
-            query: str,
-            kb_node_ids: List[str],
-            max_results: Optional[int] = 5,
-            score_threshold: Optional[float] = 0.5,
-            search_type: SearchType = SearchType.AUTO
+        self,
+        query: str,
+        kb_node_ids: List[str],
+        max_results: Optional[int] = 5,
+        score_threshold: Optional[float] = 0.5,
+        search_type: SearchType = SearchType.AUTO,
     ) -> GoKnowbApiResponse:
         """Search the knowledge base."""
         if not query or len(query.strip()) == 0:
@@ -417,22 +450,26 @@ class KnowledgeBaseClient:
         if max_results is not None and max_results < 1:
             raise ValueError("maxNumberOfResult must be greater than 0")
 
-        if score_threshold is not None and (score_threshold < 0.0 or score_threshold > 1.0):
+        if score_threshold is not None and (
+            score_threshold < 0.0 or score_threshold > 1.0
+        ):
             raise ValueError("scoreThreshold must be between 0 and 1")
 
         # Validate search_type is a proper enum
         if not isinstance(search_type, SearchType):
-            raise ValueError(f"search_type must be a SearchType enum, got {type(search_type)}")
+            raise ValueError(
+                f"search_type must be a SearchType enum, got {type(search_type)}"
+            )
 
         # Prepare request body according to API specification
         request_body = {
-            'query': query.strip(),
-            'filter': {
-                'kbNodeIds': kb_node_ids,
-                'maxNumberOfResult': max_results,
-                'scoreThreshold': score_threshold
+            "query": query.strip(),
+            "filter": {
+                "kbNodeIds": kb_node_ids,
+                "maxNumberOfResult": max_results,
+                "scoreThreshold": score_threshold,
             },
-            'searchType': search_type.value
+            "searchType": search_type.value,
         }
 
         url = f"{self.base_url}/v1/search"
@@ -455,9 +492,7 @@ class KnowledgeBaseClient:
         if not kb_node_id or len(kb_node_id.strip()) == 0:
             raise ValueError("KBNode ID cannot be empty")
 
-        request_body = {
-            'kbNodeId': kb_node_id.strip()
-        }
+        request_body = {"kbNodeId": kb_node_id.strip()}
 
         url = f"{self.base_url}/v1/sync"
         log.info(f"Triggering sync at URL: {url}")
@@ -486,7 +521,7 @@ class KnowledgeBaseClient:
             # Extract filename from path
             filename = Path(file_full_path).name
             # File ID is the part before the first underscore
-            file_id = filename.split('_')[0] if '_' in filename else filename
+            file_id = filename.split("_")[0] if "_" in filename else filename
             return file_id
         except Exception as e:
             log.warning(f"Could not extract file ID from path {file_full_path}: {e}")
@@ -496,16 +531,16 @@ class KnowledgeBaseClient:
 class GoKnowbClient(VectorDBBase):
     """
     GoKnowB vector database client implementing VectorDBBase interface.
-    
+
     This class provides a unified interface for GoKnowB operations,
     following the same pattern as OpenSearchClient.
     """
-    
+
     BASE_COLLECTION_NAME = "open_webui"
     _instance = None
     _lock = threading.Lock()
     _initialized = False
-    
+
     def __new__(cls):
         """Create or return the singleton instance."""
         if cls._instance is None:
@@ -513,20 +548,20 @@ class GoKnowbClient(VectorDBBase):
                 if cls._instance is None:
                     cls._instance = super(GoKnowbClient, cls).__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         """Initialize the GoKnowB client."""
         if not self._initialized:
             self.client = KnowledgeBaseClient()
             GoKnowbClient._initialized = True
-    
+
     @classmethod
-    def get_instance(cls) -> 'GoKnowbClient':
+    def get_instance(cls) -> "GoKnowbClient":
         """Get the singleton instance of GoKnowbClient."""
         if cls._instance is None:
             return cls()
         return cls._instance
-    
+
     @classmethod
     def reset_instance(cls):
         """Reset the singleton instance (useful for testing)."""
@@ -540,7 +575,9 @@ class GoKnowbClient(VectorDBBase):
         if collection_name is None or collection_name == "":
             collection_name = self.BASE_COLLECTION_NAME
         elif self.BASE_COLLECTION_NAME is None or self.BASE_COLLECTION_NAME == "":
-            raise ValueError("Base collection name is not set. Please set BASE_COLLECTION_NAME.")
+            raise ValueError(
+                "Base collection name is not set. Please set BASE_COLLECTION_NAME."
+            )
         elif not collection_name.startswith(self.BASE_COLLECTION_NAME):
             collection_name = f"{self.BASE_COLLECTION_NAME}/{collection_name}"
         log.debug(f"_update_collection_name output: {collection_name}")
@@ -556,15 +593,19 @@ class GoKnowbClient(VectorDBBase):
         log.debug(f"_update_collection_name_full_search output: {result}")
         return result
 
-    def _create_search_result_from_response(self, goknowb_response: GoKnowbApiResponse) -> SearchResult:
+    def _create_search_result_from_response(
+        self, goknowb_response: GoKnowbApiResponse
+    ) -> SearchResult:
         """Convert GoKnowB API response to SearchResult object."""
         if goknowb_response.status_code != 200:
-            log.warning(f"Search response status code is not 200: {goknowb_response.status_code}")
+            log.warning(
+                f"Search response status code is not 200: {goknowb_response.status_code}"
+            )
             return None
 
         response_data = goknowb_response.data
         results = response_data.get("results", [])
-        
+
         log.debug(f"Processing {len(results)} search results")
 
         ids = []
@@ -577,7 +618,7 @@ class GoKnowbClient(VectorDBBase):
                 # Extract location information
                 location = result.get("location", {})
                 kb_node_id = location.get("kbNodeId", "")
-                
+
                 # Generate a unique ID for this result
                 id = str(uuid.uuid4())
                 ids.append(id)
@@ -599,35 +640,41 @@ class GoKnowbClient(VectorDBBase):
                         path_parts = kb_node_id.split("/")
                         if len(path_parts) >= 3:
                             # Extract file_id from the filename (remove the actual filename part)
-                            full_filename = path_parts[-1]  # Last part is the full filename
+                            full_filename = path_parts[
+                                -1
+                            ]  # Last part is the full filename
                             # The file_id is the part before the underscore in the filename
-                            if '_' in full_filename:
-                                file_id = full_filename.split('_')[0]
+                            if "_" in full_filename:
+                                file_id = full_filename.split("_")[0]
                             else:
                                 file_id = full_filename  # Fallback to full filename if no underscore
                             file = Files.get_file_by_id(file_id)
-                            
+
                             # Start with all the metadata that was stored during insertion
                             # This includes file_content, file_content_encoding, and all other fields
                             metadata = {
                                 "kb_node_id": kb_node_id,
                                 "file_id": file_id,
                             }
-                            
+
                             # Add file information if available
                             if file:
-                                metadata.update({
-                                    "name": file.filename,
-                                    "created_by": file.user_id,
-                                    "source": file.filename,
-                                    "filename": file.filename,
-                                    "user_id": file.user_id,
-                                    "file_path": file.path,
-                                    # Include all the original file metadata
-                                    **file.meta,
-                                })
+                                metadata.update(
+                                    {
+                                        "name": file.filename,
+                                        "created_by": file.user_id,
+                                        "source": file.filename,
+                                        "filename": file.filename,
+                                        "user_id": file.user_id,
+                                        "file_path": file.path,
+                                        # Include all the original file metadata
+                                        **file.meta,
+                                    }
+                                )
                             else:
-                                log.warning(f"File with ID {file_id} not found in database")
+                                log.warning(
+                                    f"File with ID {file_id} not found in database"
+                                )
                         else:
                             metadata = {
                                 "kb_node_id": kb_node_id,
@@ -637,14 +684,16 @@ class GoKnowbClient(VectorDBBase):
                             "kb_node_id": kb_node_id,
                         }
                 except Exception as e:
-                    log.warning(f"Could not extract file metadata for kb_node_id {kb_node_id}: {e}")
+                    log.warning(
+                        f"Could not extract file metadata for kb_node_id {kb_node_id}: {e}"
+                    )
                     metadata = {
                         "kb_node_id": kb_node_id,
-                        "error": "Could not extract file metadata"
+                        "error": "Could not extract file metadata",
                     }
-                
+
                 metadatas.append(metadata)
-                
+
             except Exception as e:
                 log.error(f"Error processing search result: {e}")
                 # Add placeholder data to maintain list consistency
@@ -658,18 +707,22 @@ class GoKnowbClient(VectorDBBase):
             ids=[ids],
             documents=[documents],
             metadatas=[metadatas],
-            distances=[distances]
+            distances=[distances],
         )
 
-    def _create_get_result_from_response(self, goknowb_response: GoKnowbApiResponse) -> GetResult:
+    def _create_get_result_from_response(
+        self, goknowb_response: GoKnowbApiResponse
+    ) -> GetResult:
         """Convert GoKnowB API response to GetResult object."""
         if goknowb_response.status_code != 200:
-            log.warning(f"Get response status code is not 200: {goknowb_response.status_code}")
+            log.warning(
+                f"Get response status code is not 200: {goknowb_response.status_code}"
+            )
             return None
 
         response_data = goknowb_response.data
         results = response_data.get("results", [])
-        
+
         log.debug(f"Processing {len(results)} get results")
 
         ids = []
@@ -681,7 +734,7 @@ class GoKnowbClient(VectorDBBase):
                 # Extract location information
                 location = result.get("location", {})
                 kb_node_id = location.get("kbNodeId", "")
-                
+
                 # Generate a unique ID for this result
                 id = str(uuid.uuid4())
                 ids.append(id)
@@ -700,27 +753,29 @@ class GoKnowbClient(VectorDBBase):
                         if len(path_parts) >= 3:
                             file_id = path_parts[-1]  # Last part is the file_id
                             file = Files.get_file_by_id(file_id)
-                            
+
                             # Start with all the metadata that was stored during insertion
                             # This includes file_content, file_content_encoding, and all other fields
                             metadata = {
                                 "kb_node_id": kb_node_id,
                                 "file_id": file_id,
                             }
-                            
+
                             # Add file information if available
                             if file:
-                                metadata.update({
-                                    "name": file.filename,
-                                    "created_by": file.user_id,
-                                    "source": file.filename,
-                                    "filename": file.filename,
-                                    "user_id": file.user_id,
-                                    "file_path": file.path,
-                                    # Include all the original file metadata
-                                    **file.meta,
-                                })
-                                
+                                metadata.update(
+                                    {
+                                        "name": file.filename,
+                                        "created_by": file.user_id,
+                                        "source": file.filename,
+                                        "filename": file.filename,
+                                        "user_id": file.user_id,
+                                        "file_path": file.path,
+                                        # Include all the original file metadata
+                                        **file.meta,
+                                    }
+                                )
+
                                 # Try to get the original metadata that was stored during insertion
                                 # This would include file_content, file_content_encoding, etc.
                                 # Since GoKnowB doesn't store this in the search results directly,
@@ -731,9 +786,13 @@ class GoKnowbClient(VectorDBBase):
                                     # in a separate metadata field or retrieve it from the original file
                                     pass
                                 except Exception as e:
-                                    log.debug(f"Could not retrieve additional metadata for file {file_id}: {e}")
+                                    log.debug(
+                                        f"Could not retrieve additional metadata for file {file_id}: {e}"
+                                    )
                             else:
-                                log.warning(f"File with ID {file_id} not found in database")
+                                log.warning(
+                                    f"File with ID {file_id} not found in database"
+                                )
                         else:
                             metadata = {
                                 "kb_node_id": kb_node_id,
@@ -743,14 +802,16 @@ class GoKnowbClient(VectorDBBase):
                             "kb_node_id": kb_node_id,
                         }
                 except Exception as e:
-                    log.warning(f"Could not extract file metadata for kb_node_id {kb_node_id}: {e}")
+                    log.warning(
+                        f"Could not extract file metadata for kb_node_id {kb_node_id}: {e}"
+                    )
                     metadata = {
                         "kb_node_id": kb_node_id,
-                        "error": "Could not extract file metadata"
+                        "error": "Could not extract file metadata",
                     }
-                
+
                 metadatas.append(metadata)
-                
+
             except Exception as e:
                 log.error(f"Error processing get result: {e}")
                 # Add placeholder data to maintain list consistency
@@ -759,11 +820,7 @@ class GoKnowbClient(VectorDBBase):
                 metadatas.append({})
 
         log.info(f"Created get result with {len(ids)} items")
-        return GetResult(
-            ids=[ids],
-            documents=[documents],
-            metadatas=[metadatas]
-        )
+        return GetResult(ids=[ids], documents=[documents], metadatas=[metadatas])
 
     def has_collection(self, collection_name: str) -> bool:
         """Check if the collection exists in the vector DB."""
@@ -771,62 +828,81 @@ class GoKnowbClient(VectorDBBase):
             collection_name = self._update_collection_name(collection_name)
             log.info(f"Checking if collection exists: {collection_name}")
             result = self.client.get_kbnode_details(collection_name)
-            if result.status_code==404 and result.data.get("error"):
-                log.info(f"Collection {collection_name} does not exist: {result.data.get('error')}")
+            if result.status_code == 404 and result.data.get("error"):
+                log.info(
+                    f"Collection {collection_name} does not exist: {result.data.get('error')}"
+                )
                 return False
-            elif result.status_code==200:
+            elif result.status_code == 200:
                 log.info(f"Collection {collection_name} exists.")
                 return True
             else:
                 raise Exception(f" API response: {result}")
         except Exception as e:
-            log.error(f"Failed to get details for collection_name {collection_name}: {e}")
+            log.error(
+                f"Failed to get details for collection_name {collection_name}: {e}"
+            )
             raise
 
-    def _wait_for_kbnode_indexing(self, kb_node_id: str, node_type: str, max_wait_time: int = 300, poll_interval: int = 5) -> bool:
+    def _wait_for_kbnode_indexing(
+        self,
+        kb_node_id: str,
+        node_type: str,
+        max_wait_time: int = 300,
+        poll_interval: int = 5,
+    ) -> bool:
         """
         Wait for KB node to be indexed.
-        
+
         Args:
             kb_node_id: The KB node ID to check
             node_type: Type of node for logging purposes (e.g., "Search", "Full Search")
             max_wait_time: Maximum time to wait in seconds (default: 300 seconds = 5 minutes)
             poll_interval: Time between status checks in seconds (default: 5 seconds)
-            
+
         Returns:
             bool: True if indexed successfully, False if failed or timed out
         """
         start_time = time.time()
-        
+
         while time.time() - start_time < max_wait_time:
             try:
                 log.info(f"Checking {node_type} KB node status: {kb_node_id}")
                 status_result = self.client.get_kbnode_details(kb_node_id)
-                
+
                 if status_result.status_code == 200:
                     kb_node = status_result.data.get("kbNode", {})
                     status = kb_node.get("status")
 
-                    
                     if status == "INDEXED":
-                        log.info(f"✓ {node_type} KB node indexed successfully: {kb_node_id}")
+                        log.info(
+                            f"✓ {node_type} KB node indexed successfully: {kb_node_id}"
+                        )
                         return True
                     elif status == "FAILED":
                         error_message = kb_node.get("errorMessage", "Unknown error")
-                        log.error(f"✗ {node_type} KB node indexing failed: {kb_node_id} - {error_message}")
+                        log.error(
+                            f"✗ {node_type} KB node indexing failed: {kb_node_id} - {error_message}"
+                        )
                         return False
                     else:
-                        log.info(f"⏳ {node_type} KB node status: {status} - {kb_node_id}")
+                        log.info(
+                            f"⏳ {node_type} KB node status: {status} - {kb_node_id}"
+                        )
                 else:
-                    log.warning(f"Failed to get {node_type} KB node status: {status_result.status_code}")
-                
+                    log.warning(
+                        f"Failed to get {node_type} KB node status: {status_result.status_code}"
+                    )
+
                 time.sleep(poll_interval)
-                
+
             except Exception as e:
                 log.warning(f"Error checking {node_type} KB node status: {e}")
                 time.sleep(poll_interval)
-        
-        log.warning(f"Timeout waiting for {node_type} KB node to be indexed: {kb_node_id}")
+
+        log.warning(
+            f"Timeout waiting for {node_type} KB node to be indexed: {kb_node_id}"
+        )
         return False
 
     def _get_file_id_from_file_path(self, file_full_path: str) -> str:
@@ -835,7 +911,7 @@ class GoKnowbClient(VectorDBBase):
             # Extract filename from path
             filename = Path(file_full_path).name
             # File ID is the part before the first underscore
-            file_id = filename.split('_')[0] if '_' in filename else filename
+            file_id = filename.split("_")[0] if "_" in filename else filename
             return file_id
         except Exception as e:
             log.warning(f"Could not extract file ID from path {file_full_path}: {e}")
@@ -846,8 +922,12 @@ class GoKnowbClient(VectorDBBase):
         try:
             file_id = self._get_file_id_from_file_path(file_full_path)
             file_obj = Files.get_file_by_id(file_id)
-            if file_obj and file_obj.meta and file_obj.meta.get('data', {}).get('upload_source'):
-                return file_obj.meta['data']['upload_source']
+            if (
+                file_obj
+                and file_obj.meta
+                and file_obj.meta.get("data", {}).get("upload_source")
+            ):
+                return file_obj.meta["data"]["upload_source"]
             else:
                 return "unknown"
         except Exception as e:
@@ -860,19 +940,25 @@ class GoKnowbClient(VectorDBBase):
         search_indexed = self._wait_for_kbnode_indexing(kb_node_path, "Search")
         indexing_end_time = time.time()
         indexing_duration = indexing_end_time - indexing_start_time
-        
+
         if search_indexed:
-            log.info(f"✓ Indexing completed successfully in {indexing_duration:.2f} seconds")
+            log.info(
+                f"✓ Indexing completed successfully in {indexing_duration:.2f} seconds"
+            )
         else:
-            log.warning(f"✗ Indexing failed or timed out after {indexing_duration:.2f} seconds")
-        
+            log.warning(
+                f"✗ Indexing failed or timed out after {indexing_duration:.2f} seconds"
+            )
+
         return search_indexed, indexing_duration
 
     def delete_collection(self, collection_name: str) -> None:
         """Delete a collection from the vector DB."""
         try:
-            log.info("delete_collection called with collection_name: %s", collection_name)
-            #full_search_collection_name = self._update_collection_name_full_search(collection_name)
+            log.info(
+                "delete_collection called with collection_name: %s", collection_name
+            )
+            # full_search_collection_name = self._update_collection_name_full_search(collection_name)
             search_collection_name = self._update_collection_name(collection_name)
             log.info(f"Deleting search collection: {search_collection_name}")
             result = self.client.delete_kbnode(search_collection_name)
@@ -889,11 +975,17 @@ class GoKnowbClient(VectorDBBase):
     def delete_file(self, collection_name: str, file_full_name: str) -> None:
         """Delete a file inside collection from the vector DB."""
         try:
-            log.info("delete_file called with collection_name: %s, file_full_name: %s", collection_name, file_full_name)
+            log.info(
+                "delete_file called with collection_name: %s, file_full_name: %s",
+                collection_name,
+                file_full_name,
+            )
             search_collection_name = self._update_collection_name(collection_name)
-            #full_search_collection_name = self._update_collection_name_full_search(collection_name)
-            #result = self.client.delete_kbnode(full_search_collection_name+"/"+file_full_name)
-            result = self.client.delete_kbnode(search_collection_name+"/"+file_full_name)
+            # full_search_collection_name = self._update_collection_name_full_search(collection_name)
+            # result = self.client.delete_kbnode(full_search_collection_name+"/"+file_full_name)
+            result = self.client.delete_kbnode(
+                search_collection_name + "/" + file_full_name
+            )
             if result.status_code != 200:
                 raise Exception(f" API response: {result}")
             log.info(f"Successfully deleted collection_name: {collection_name}")
@@ -904,20 +996,20 @@ class GoKnowbClient(VectorDBBase):
 
     def insert(self, collection_name: str, file_full_path: str) -> None:
         """Insert a list of vector items into a collection."""
-        #full_search_collection_name = self._update_collection_name_full_search(collection_name)
+        # full_search_collection_name = self._update_collection_name_full_search(collection_name)
         search_collection_name = self._update_collection_name(collection_name)
-        
+
         try:
             log.info(f"Creating KB nodes for collection: {collection_name}")
             log.info(f"File path: {file_full_path}")
             log.info(f"Search collection KB node ID: {search_collection_name}")
-            
+
             # Check if we have upload source information in the file metadata
             upload_source = self._get_upload_source_from_file(file_full_path)
             log.info(f"File upload source: {upload_source}")
-            
-            #log.info(f"Full search collection KB node ID: {full_search_collection_name}")
-            
+
+            # log.info(f"Full search collection KB node ID: {full_search_collection_name}")
+
             log.info(f"Creating search KB node: {search_collection_name}")
             result = self.client.create_kbnode_with_file(
                 kb_node_id=search_collection_name,
@@ -931,34 +1023,38 @@ class GoKnowbClient(VectorDBBase):
             log.info(f"✓ Successfully created search KB node: {search_collection_name}")
             log.info(f"Successfully created file KB node: {search_collection_name}")
 
-          
             if result.status_code != 202:
                 raise Exception(f" API response: {result}")
 
-
             file_name = Path(file_full_path).name
-            file_id = file_name.split('_')[0] if '_' in file_name else file_name
+            file_id = file_name.split("_")[0] if "_" in file_name else file_name
             kb_node_path = f"{search_collection_name}/{file_name}"
             log.info(f"Checking indexing status for KB node: {kb_node_path}")
-            
+
             # Only sync and check indexing for specific conditions
-            if (upload_source == "knowledge" and "file-" not in search_collection_name) or \
-                (upload_source == "chat" and "file-" in search_collection_name):
-                
+            if (
+                upload_source == "knowledge" and "file-" not in search_collection_name
+            ) or (upload_source == "chat" and "file-" in search_collection_name):
+
                 # Sync KB node before checking indexing
                 log.info(f"Syncing search KB node: {search_collection_name}")
                 sync_result = self.client.sync_kb("/" + search_collection_name)
                 if sync_result.status_code == 202:
-                    log.info(f"✓ Successfully synced search KB node: {search_collection_name}")
+                    log.info(
+                        f"✓ Successfully synced search KB node: {search_collection_name}"
+                    )
                 else:
-                    log.warning(f"Sync failed for search KB node {search_collection_name}: {sync_result.status_code}")
-                
+                    log.warning(
+                        f"Sync failed for search KB node {search_collection_name}: {sync_result.status_code}"
+                    )
+
                 # Check indexing status
-                search_indexed, indexing_duration = self._time_indexing_process(kb_node_path)
+                search_indexed, indexing_duration = self._time_indexing_process(
+                    kb_node_path
+                )
             else:
                 search_indexed = True
 
-            
             if not search_indexed:
                 raise Exception("KB node failed to index within timeout period")
             else:
@@ -967,8 +1063,6 @@ class GoKnowbClient(VectorDBBase):
         except Exception as e:
             log.error(f"Failed to create file {collection_name}/{file_full_path}: {e}")
             raise
-
-
 
     def upsert(self, collection_name: str, file_full_path: str) -> None:
         """Insert or update vector items in a collection."""
@@ -982,10 +1076,10 @@ class GoKnowbClient(VectorDBBase):
         try:
 
             query = "semantic search query"
-            
+
             search_collection_name = self._update_collection_name(collection_name)
             kb_node_ids = [search_collection_name]
-                
+
             log.debug(f"Searching collections: {kb_node_ids}")
             log.debug(f"Vector dimensions: {len(vectors[0]) if vectors else 0}")
             result = self.client.search_kb(
@@ -993,92 +1087,102 @@ class GoKnowbClient(VectorDBBase):
                 kb_node_ids=kb_node_ids,
                 max_results=limit,
                 score_threshold=0.0,
-                search_type=SearchType.AUTO
+                search_type=SearchType.AUTO,
             )
-            
+
             log.debug(f"Search API response status: {result.status_code}")
-            
+
             # Handle different status codes appropriately
             if result.status_code == 200:
                 log.info(f"Search completed for query: {query[:50]}...")
                 return self._create_search_result_from_response(result)
             elif result.status_code == 403:
-                log.error(f"Authentication failed for search. Status: {result.status_code}, Response: {result.data}")
+                log.error(
+                    f"Authentication failed for search. Status: {result.status_code}, Response: {result.data}"
+                )
                 return None
             elif result.status_code == 404:
                 log.warning(f"Collection not found for search: {kb_node_ids}")
                 return None
             else:
-                log.error(f"Unexpected API response for search. Status: {result.status_code}, Response: {result.data}")
+                log.error(
+                    f"Unexpected API response for search. Status: {result.status_code}, Response: {result.data}"
+                )
                 return None
-            
+
         except Exception as e:
             log.error(f"Search failed for query '{query}': {e}")
             return None
 
     def search_text(
-        self, 
-        collection_names: List[str] = None, 
+        self,
+        collection_names: List[str] = None,
         query: str = None,
         limit: int = None,
         search_type: SearchType = None,
-        score_threshold: float = None
+        score_threshold: float = None,
     ) -> Optional[SearchResult]:
         """Search for text in collections using GoKnowB API."""
         try:
             # Handle different parameter combinations
             if collection_names is None:
                 raise ValueError("collection_names must be provided")
-            
+
             if query is None:
                 query = "semantic search query"
-            
+
             if limit is None:
                 limit = 10
-                
+
             if search_type is None:
                 search_type = SearchType.SEMANTIC
             elif not isinstance(search_type, SearchType):
-                raise ValueError(f"search_type must be a SearchType enum, got {type(search_type)}")
-                
+                raise ValueError(
+                    f"search_type must be a SearchType enum, got {type(search_type)}"
+                )
+
             if score_threshold is None:
                 score_threshold = 0.1
-            
+
             # Convert collection names to kb_node_ids
             kb_node_ids = []
             for collection_name in collection_names:
                 kb_node_ids.append(self._update_collection_name(collection_name))
-                
+
             log.debug(f"Searching collections: {kb_node_ids}")
             log.debug(f"Query: {query}")
             log.debug(f"Search type: {search_type}")
             log.debug(f"Score threshold: {score_threshold}")
             log.debug(f"Limit: {limit}")
-                
+
             result = self.client.search_kb(
                 query=query,
                 kb_node_ids=kb_node_ids,
                 max_results=limit,
                 score_threshold=score_threshold,
-                search_type=search_type
+                search_type=search_type,
             )
-            
+
             log.debug(f"Search API response status: {result.status_code}")
-            
+
             # Handle different status codes appropriately
             if result.status_code == 200:
                 log.debug(f"Search completed for query: {query[:50]}...")
                 return self._create_search_result_from_response(result)
             elif result.status_code == 403:
-                log.error(f"Authentication failed for search. Status: {result.status_code}, Response: {result.data}")
+                log.error(
+                    f"Authentication failed for search. Status: {result.status_code}, Response: {result.data}"
+                )
                 return None
             elif result.status_code == 404:
                 log.warning(f"Collection not found for search: {kb_node_ids}")
                 return None
             else:
-                log.error(f"Unexpected API response for search. Status: {result.status_code}, Response: {result.data}")
+                log.error(
+                    f"Unexpected API response for search. Status: {result.status_code}, Response: {result.data}"
+                )
                 return None
-            
+
         except Exception as e:
             log.error(f"Search failed for query '{query}': {e}")
             return None
@@ -1089,17 +1193,16 @@ class GoKnowbClient(VectorDBBase):
         """Query vectors from a collection using metadata filter."""
         pass
 
-
     def get(self, collection_name: str) -> Optional[GetResult]:
         """Retrieve all vectors from a collection."""
         search_collection_name = self._update_collection_name(collection_name)
         log.info(f"Getting all documents from collection {collection_name}")
         log.info(f"Full search collection path: {search_collection_name}")
-        
+
         return self.search_text(
-            collection_names=[search_collection_name], 
+            collection_names=[search_collection_name],
             query="retrieve all documents",
-            score_threshold=0.0
+            score_threshold=0.0,
         )
 
     def delete(
@@ -1115,7 +1218,7 @@ class GoKnowbClient(VectorDBBase):
                 # For GoKnowB, IDs would map to specific file_ids
                 for file_id in ids:
                     self._delete_file_from_collection(collection_name, file_id)
-                    
+
             elif filter:
                 log.info(f"Delete collection: {collection_name} with filter: {filter}")
                 # Extract file_id from filter
@@ -1126,7 +1229,7 @@ class GoKnowbClient(VectorDBBase):
                     log.warning(f"No file_id found in filter: {filter}")
             else:
                 log.warning("No IDs or filter provided for delete operation")
-                
+
         except Exception as e:
             log.error(f"Failed to delete from collection {collection_name}: {e}")
             raise
@@ -1142,37 +1245,53 @@ class GoKnowbClient(VectorDBBase):
                 log.warning(f"File with ID {file_id} not found")
                 return
             file_name = file_obj.filename
-            collection_based_search_path = f"open_webui/{collection_name}/{file_id}_{file_name}"
-            
+            collection_based_search_path = (
+                f"open_webui/{collection_name}/{file_id}_{file_name}"
+            )
+
             log.info(f"Collection name: {collection_name}")
             log.info(f"Deleting file {file_id} from collection {collection_name}")
             log.info(f"File-based search path: {file_based_search_path}")
-          
+
             try:
                 result = self.client.delete_kbnode(file_based_search_path)
                 if result.status_code == 200:
-                    log.info(f"Successfully deleted file-based search document: {file_based_search_path}")
+                    log.info(
+                        f"Successfully deleted file-based search document: {file_based_search_path}"
+                    )
                 elif result.status_code == 404:
-                    log.warning(f"File-based search document not found: {file_based_search_path}")
+                    log.warning(
+                        f"File-based search document not found: {file_based_search_path}"
+                    )
                 else:
-                    log.warning(f"Unexpected response deleting file-based search document: {result.status_code}")
+                    log.warning(
+                        f"Unexpected response deleting file-based search document: {result.status_code}"
+                    )
             except Exception as e:
                 log.warning(f"Error deleting file-based search document: {e}")
-            
-            #Delete from full search collection
+
+            # Delete from full search collection
             try:
                 result = self.client.delete_kbnode(collection_based_search_path)
                 if result.status_code == 200:
-                    log.info(f"Successfully deleted file-based full search document: {collection_based_search_path}")
+                    log.info(
+                        f"Successfully deleted file-based full search document: {collection_based_search_path}"
+                    )
                 elif result.status_code == 404:
-                    log.warning(f"File-based full search document not found: {collection_based_search_path}")
+                    log.warning(
+                        f"File-based full search document not found: {collection_based_search_path}"
+                    )
                 else:
-                    log.warning(f"Unexpected response deleting file-based full search document: {result.status_code}")
+                    log.warning(
+                        f"Unexpected response deleting file-based full search document: {result.status_code}"
+                    )
             except Exception as e:
                 log.warning(f"Error deleting file-based full search document: {e}")
-                
+
         except Exception as e:
-            log.error(f"Failed to delete file {file_id} from collection {collection_name}: {e}")
+            log.error(
+                f"Failed to delete file {file_id} from collection {collection_name}: {e}"
+            )
             raise
 
     def reset(self) -> None:
@@ -1216,8 +1335,10 @@ class GoKnowbClient(VectorDBBase):
         add: bool = False,
         user=None,
     ) -> bool:
-        log.debug(f"save_docs_to_vector_db collection name: {collection_name}, metadata: {metadata}, overwrite: {overwrite}, split: {split}, add: {add}")
-        
+        log.debug(
+            f"save_docs_to_vector_db collection name: {collection_name}, metadata: {metadata}, overwrite: {overwrite}, split: {split}, add: {add}"
+        )
+
         try:
             if self.has_collection(collection_name=collection_name):
                 log.info(f"collection {collection_name} already exists")
@@ -1232,7 +1353,7 @@ class GoKnowbClient(VectorDBBase):
                     return True
 
             log.info(f"adding to collection {collection_name}")
-            file_id = metadata.get('file_id')
+            file_id = metadata.get("file_id")
             file = Files.get_file_by_id(file_id)
             log.debug(f"file path : {file.path}")
             full_file_name = f"{metadata.get('file_id')}_{metadata.get('name')}"
@@ -1242,23 +1363,26 @@ class GoKnowbClient(VectorDBBase):
             log.exception(e)
             raise e
 
-    def query_doc_handler(self, request: Request, form_data: QueryDocForm) -> Optional[GetResult]:
+    def query_doc_handler(
+        self, request: Request, form_data: QueryDocForm
+    ) -> Optional[GetResult]:
         try:
             search_type = SearchType.SEMANTIC
             r = 0.0
             if request.app.state.config.ENABLE_RAG_HYBRID_SEARCH:
                 search_type = SearchType.LEXICAL_AND_SEMANTIC
                 r = (
-                        form_data.r
-                        if form_data.r
-                        else request.app.state.config.RELEVANCE_THRESHOLD
-                    )
+                    form_data.r
+                    if form_data.r
+                    else request.app.state.config.RELEVANCE_THRESHOLD
+                )
 
             return self.search_text(
-                collection_names=[form_data.collection_name], query=form_data.query,
+                collection_names=[form_data.collection_name],
+                query=form_data.query,
                 limit=form_data.k if form_data.k else request.app.state.config.TOP_K,
                 search_type=search_type,
-                score_threshold=r
+                score_threshold=r,
             )
         except Exception as e:
             log.exception(e)
@@ -1272,8 +1396,8 @@ class GoKnowbClient(VectorDBBase):
 def create_goknowb_client() -> GoKnowbClient:
     """
     Factory function to get the singleton GoKnowB client instance.
-    
+
     Returns:
         GoKnowbClient: The singleton instance
     """
-    return GoKnowbClient.get_instance() 
+    return GoKnowbClient.get_instance()

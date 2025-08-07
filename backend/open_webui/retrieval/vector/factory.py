@@ -48,7 +48,7 @@ class Vector:
                 from open_webui.retrieval.vector.dbs.chroma import ChromaClient
 
                 return ChromaClient()
-                
+
             case VectorType.GOKNOWB:
                 from open_webui.retrieval.vector.dbs.goknowb import GoKnowbClient
 
