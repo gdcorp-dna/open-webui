@@ -22,7 +22,8 @@
 		mobile,
 		temporaryChatEnabled,
 		settings,
-		config
+		config,
+		isSDMEnabled
 	} from '$lib/stores';
 	import { toast } from 'svelte-sonner';
 	import { capitalizeFirstLetter, sanitizeResponseContent, splitStream } from '$lib/utils';
@@ -136,7 +137,15 @@
 							return item.model?.direct;
 						}
 					})
-	).filter((item) => !(item.model?.info?.meta?.hidden ?? false));
+	).filter((item) => !(item.model?.info?.meta?.hidden ?? false))
+	 // Filter models with SDM tag when SDM mode is enabled
+	 .filter(item => {
+		// Only apply SDM filter when SDM mode is enabled
+		if ($isSDMEnabled) {
+			return item?.model?.tags.some(tag => tag.name === "SDM");
+		}
+		return true; // Show all models when SDM mode is disabled
+	});
 
 	$: if (selectedTag || selectedConnectionType) {
 		resetView();
@@ -613,9 +622,12 @@
 				{/each}
 			</div>
 
-			<!-- {#if settings?.sdmMode } -->
-				<SDMSwitch/>
-				<!-- {/if} -->
+			{#if $user?.role === 'admin' || ($user?.permissions?.features?.sdm ?? false)}
+				<SDMSwitch on:change={(event) => {
+					// Reset view to apply filter
+					resetView();
+				}}/>
+			{/if}
 			{#if showTemporaryChatControl}
 				<div class="flex items-center mx-2 mt-1 mb-2">
 					<button
